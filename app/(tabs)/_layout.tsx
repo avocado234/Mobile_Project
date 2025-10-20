@@ -25,35 +25,29 @@ export default function TabLayout() {
       
       }}>
       <Tabs.Screen
-        name="index"
+        name="Profilescreen"
         options={{
-          title: 'Tab One',
-          tabBarIcon: ({ color }) => <TabBarIcon name="code" color={color} />,
+          title: 'Profile',
+          tabBarIcon: ({ color }) => <TabBarIcon name= "user" color={color} />,
         
-        }}
-      />
-      <Tabs.Screen
-        name="two"
-        options={{
-          title: 'Tab Two',
-          tabBarIcon: ({ color }) => <TabBarIcon name="code" color={color} />,
         }}
       />
       
       <Tabs.Screen
-        name="home"
+        name="Scanscreen"
         options={{
-          title: 'Tab three',
-          tabBarIcon: ({ color }) => <TabBarIcon name="code" color={color} />,
+          title: 'Scan',
+          tabBarIcon: ({ color }) => <TabBarIcon name= "camera-retro" color={color} />,
         }}
       />
       <Tabs.Screen
-        name="modal"
+        name="Historyscreen"
         options={{
-          title: 'Tab four',
-          tabBarIcon: ({ color }) => <TabBarIcon name="code" color={color} />,
+          title: 'Home',
+          tabBarIcon: ({ color }) => <TabBarIcon name= "history" color={color} />,
         }}
-      />  
+      />
+     
     </Tabs>
   );
 }
