@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-export default function TabthreeScreen() {
+export default function TabtwoScreen() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Tab home</Text>
