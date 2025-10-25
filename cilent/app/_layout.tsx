@@ -5,8 +5,7 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
-
-import { useColorScheme } from '@/components/useColorScheme';
+import { useColorScheme } from '../components/useColorScheme';
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -50,8 +49,8 @@ function RootLayoutNav() {
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="sign" options={{ headerShown: false}} />
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="signinscreen" options={{ headerShown: false}} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false}} /> 
         
       </Stack>
