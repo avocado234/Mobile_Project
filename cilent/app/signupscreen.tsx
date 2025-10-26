@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
-  Alert,
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   SafeAreaView,
@@ -13,6 +13,8 @@ import {
   View,
 } from 'react-native';
 
+import { signUpWithEmail } from '@/services/auth';
+
 
 export default function SignUpScreen() {
   const router = useRouter();
@@ -20,21 +22,41 @@ export default function SignUpScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSignUp = () => {
-    if (!name.trim() || !email.trim() || !password.trim() || !confirmPassword.trim()) {
-      Alert.alert('Missing information', 'Please fill in all fields to continue.');
+  const handleSignUp = async () => {
+    const normalizedName = name.trim();
+    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedPassword = password.trim();
+    const normalizedConfirmPassword = confirmPassword.trim();
+
+    if (!normalizedName || !normalizedEmail || !normalizedPassword || !normalizedConfirmPassword) {
+      setErrorMessage('Please fill in all fields to continue.');
       return;
     }
 
-    if (password !== confirmPassword) {
-      Alert.alert('Passwords do not match', 'Please make sure both password entries are the same.');
+    if (normalizedPassword !== normalizedConfirmPassword) {
+      setErrorMessage('Passwords do not match. Please try again.');
       return;
     }
 
-    // In a real app this is where the registration logic would live.
-    Alert.alert('Account created', 'You can now sign in with your new credentials.');
-    router.replace('/signinscreen');
+    try {
+      setIsSubmitting(true);
+      setErrorMessage(null);
+      const result = await signUpWithEmail(normalizedName, normalizedEmail, normalizedPassword);
+      if (!result.ok) {
+        setErrorMessage(result.message);
+        return;
+      }
+      router.replace('/(tabs)/Scanscreen');
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : 'Something went wrong. Please try again.'
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -99,9 +121,21 @@ export default function SignUpScreen() {
               />
             </View>
 
-            <TouchableOpacity style={styles.primaryButton} onPress={handleSignUp}>
-              <Text style={styles.primaryButtonText}>Sign Up</Text>
+            <TouchableOpacity
+              style={[styles.primaryButton, isSubmitting && styles.primaryButtonDisabled]}
+              onPress={handleSignUp}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator color="#fff" />
+                  <Text style={styles.primaryButtonText}>Creating account...</Text>
+                </View>
+              ) : (
+                <Text style={styles.primaryButtonText}>Sign Up</Text>
+              )}
             </TouchableOpacity>
+            {errorMessage && <Text style={styles.errorText}>{errorMessage}</Text>}
 
             <TouchableOpacity
               style={styles.secondaryButton}
@@ -170,10 +204,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 8,
   },
+  primaryButtonDisabled: {
+    opacity: 0.75,
+  },
   primaryButtonText: {
     color: '#fff',
     fontSize: 18,
     fontWeight: '600',
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   secondaryButton: {
     paddingVertical: 16,
@@ -186,5 +228,11 @@ const styles = StyleSheet.create({
     color: '#344054',
     fontSize: 16,
     fontWeight: '600',
+  },
+  errorText: {
+    color: '#B91C1C',
+    textAlign: 'center',
+    marginTop: 8,
+    fontWeight: '500',
   },
 });
