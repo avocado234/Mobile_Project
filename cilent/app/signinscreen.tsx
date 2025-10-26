@@ -1,7 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
-    Alert,
     ActivityIndicator,
     KeyboardAvoidingView,
     Platform,
@@ -13,33 +12,40 @@ import {
     View,
 } from 'react-native';
 
+import { signInWithEmail } from '@/services/auth';
+
 
 export default function SignInScreen() {
     const router = useRouter();
-    
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
 
     const handleSignIn = async () => {
-        if (!email.trim() || !password.trim()) {
-            Alert.alert('Missing information', 'Please provide both email and password.');
+        const normalizedEmail = email.trim().toLowerCase();
+        const normalizedPassword = password.trim();
+
+        if (!normalizedEmail || !normalizedPassword) {
+            setErrorMessage('Please provide both email and password.');
             return;
         }
 
         try {
-            
-            Alert.alert('Signed in', 'Welcome back!');
+            setIsLoading(true);
+            setErrorMessage(null);
+            const result = await signInWithEmail(normalizedEmail, normalizedPassword);
+            if (!result.ok) {
+                setErrorMessage(result.message);
+                return;
+            }
             router.replace('/(tabs)/Scanscreen');
         } catch (error) {
-            const message =
-                typeof error === 'string'
-                    ? error
-                    : error instanceof Error
-                    ? error.message
-                    : 'Something went wrong. Please try again.';
-            Alert.alert('Sign in failed', message);
+            setErrorMessage(
+                error instanceof Error ? error.message : 'Something went wrong. Please try again.'
+            );
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -49,7 +55,7 @@ export default function SignInScreen() {
                 style={styles.container}
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             >
-                <View style={styles.header}>
+                <View style ={styles.header}>
                     <Text style={styles.title}>Welcome back</Text>
                     <Text style={styles.subtitle}>Sign in to continue with your account.</Text>
                 </View>
@@ -82,7 +88,7 @@ export default function SignInScreen() {
                     </View>
 
                     <TouchableOpacity
-                        style={[styles.primaryButton, isLoading && styles.primaryButtonDisabled]}
+                        style={ [styles.primaryButton, isLoading && styles.primaryButtonDisabled]}
                         onPress={handleSignIn}
                         disabled={isLoading}
                     >
@@ -95,6 +101,7 @@ export default function SignInScreen() {
                             <Text style={styles.primaryButtonText}>Sign In</Text>
                         )}
                     </TouchableOpacity>
+                    {errorMessage && <Text style={styles.errorText}>{errorMessage}</Text>}
                     <View style={styles.footer}>
                         <Text style={styles.footerText}>Need an account?</Text>
                         <TouchableOpacity onPress={() => router.push('./signupscreen')}>
