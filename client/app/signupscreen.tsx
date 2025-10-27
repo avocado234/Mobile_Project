@@ -13,8 +13,8 @@ import {
   View,
 } from 'react-native';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
-import { Picker } from '@react-native-picker/picker';   // ✅ เพิ่ม picker
-
+import DropDownPicker from 'react-native-dropdown-picker';
+import { Ionicons } from '@expo/vector-icons';
 import { signUpWithEmail } from '@/services/auth';
 
 export default function SignUpScreen() {
@@ -24,8 +24,16 @@ export default function SignUpScreen() {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [birthDate, setBirthDate] = useState<Date | null>(null);
-  const [gender, setGender] = useState<string>('');    // ✅ เพิ่มเพศ
   const [showDatePicker, setShowDatePicker] = useState(false);
+
+  // ✅ Gender dropdown state
+  const [genderOpen, setGenderOpen] = useState(false);
+  const [gender, setGender] = useState<string | null>(null);
+  const [genderItems, setGenderItems] = useState([
+    { label: 'Male', value: 'male' },
+    { label: 'Female', value: 'female' },
+    { label: 'Other', value: 'other' },
+  ]);
 
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -76,13 +84,14 @@ export default function SignUpScreen() {
       setIsSubmitting(true);
       setErrorMessage(null);
 
+      // ✅ คุณสามารถแก้ service ให้เก็บ gender/birthDate/phone เพิ่มเติมได้
       const result = await signUpWithEmail(
         normalizedName,
         normalizedEmail,
         normalizedPassword,
         normalizedPhone,
-        birthDate.toISOString(),
-        gender
+        gender,
+        birthDate.toISOString().split('T')[0] // Format as YYYY-MM-DD
       );
 
       if (!result.ok) {
@@ -147,7 +156,7 @@ export default function SignUpScreen() {
               />
             </View>
 
-            {/* ✅ Birth Date + Gender ใน 1 แถว */}
+            {/* ✅ Birth Date + Gender */}
             <View style={styles.row}>
               <View style={[styles.field, styles.rowItem]}>
                 <Text style={styles.label}>Birth Date</Text>
@@ -156,10 +165,12 @@ export default function SignUpScreen() {
                   activeOpacity={0.8}
                   style={styles.inputButton}
                 >
-                  <Text style={birthDate ? styles.inputButtonText : styles.placeholderText}>
-                    {birthDate ? birthDate.toLocaleDateString() : 'Select your birth date'}
+                  <Ionicons name="calendar-outline" size={20} color="#475467" />
+                  <Text style={birthDate ? styles.inputText : styles.placeholder}>
+                    {birthDate ? birthDate.toLocaleDateString() : 'Select birth date'}
                   </Text>
                 </TouchableOpacity>
+
                 {showDatePicker && (
                   <DateTimePicker
                     value={birthDate ?? new Date(2000, 0, 1)}
@@ -171,20 +182,22 @@ export default function SignUpScreen() {
                 )}
               </View>
 
-              <View style={[styles.field, styles.rowItem]}>
+              <View style={[styles.field, styles.rowItem, { zIndex: 10 }]}>
                 <Text style={styles.label}>Gender</Text>
-                <View style={styles.pickerWrapper}>
-                  <Picker
-                    selectedValue={gender}
-                    onValueChange={(value) => setGender(value)}
-                    style={styles.picker}
-                  >
-                    <Picker.Item label="Select" value="" />
-                    <Picker.Item label="Male" value="male" />
-                    <Picker.Item label="Female" value="female" />
-                    <Picker.Item label="Other" value="other" />
-                  </Picker>
-                </View>
+                <DropDownPicker
+                  open={genderOpen}
+                  value={gender}
+                  items={genderItems}
+                  setOpen={setGenderOpen}
+                  setValue={setGender}
+                  setItems={setGenderItems}
+                  placeholder="Select gender"
+                  style={styles.dropdown}
+                  dropDownContainerStyle={styles.dropdownContainer}
+                  textStyle={styles.inputText}
+                  placeholderStyle={styles.placeholder}
+                  listMode="SCROLLVIEW"
+                />
               </View>
             </View>
 
@@ -262,7 +275,7 @@ const styles = StyleSheet.create({
     color: '#101828',
   },
 
-  row: { flexDirection: 'row', gap: 12 },          // ✅ แถว 2 ช่อง
+  row: { flexDirection: 'row', gap: 12 },
   rowItem: { flex: 1 },
 
   inputButton: {
@@ -272,22 +285,22 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 16,
     backgroundColor: '#fff',
-    justifyContent: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
     minHeight: 48,
   },
-  inputButtonText: { fontSize: 16, color: '#101828' },
-  placeholderText: { fontSize: 16, color: '#98A2B3' },
+  inputText: { fontSize: 16, color: '#101828', marginLeft: 8 },
+  placeholder: { fontSize: 16, color: '#98A2B3', marginLeft: 8 },
 
-  pickerWrapper: {
-    borderWidth: 1,
+  dropdown: {
     borderColor: '#D0D5DD',
     borderRadius: 12,
     backgroundColor: '#fff',
-    overflow: 'hidden',
+    minHeight: 48,
   },
-  picker: {
-    height: 48,
-    color: '#101828',
+  dropdownContainer: {
+    borderColor: '#D0D5DD',
+    borderRadius: 12,
   },
 
   primaryButton: {
