@@ -12,27 +12,58 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
+import { Picker } from '@react-native-picker/picker';   // ✅ เพิ่ม picker
 
 import { signUpWithEmail } from '@/services/auth';
 
-
 export default function SignUpScreen() {
   const router = useRouter();
+
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [birthDate, setBirthDate] = useState<Date | null>(null);
+  const [gender, setGender] = useState<string>('');    // ✅ เพิ่มเพศ
+  const [showDatePicker, setShowDatePicker] = useState(false);
+
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const onChangeBirthDate = (_: DateTimePickerEvent, selected?: Date) => {
+    setShowDatePicker(false);
+    if (selected) setBirthDate(selected);
+  };
+
+  const isValidPhone = (value: string) => {
+    const digits = value.replace(/\D/g, '');
+    return digits.length >= 9 && digits.length <= 15;
+  };
 
   const handleSignUp = async () => {
     const normalizedName = name.trim();
     const normalizedEmail = email.trim().toLowerCase();
     const normalizedPassword = password.trim();
     const normalizedConfirmPassword = confirmPassword.trim();
+    const normalizedPhone = phone.trim();
 
-    if (!normalizedName || !normalizedEmail || !normalizedPassword || !normalizedConfirmPassword) {
+    if (
+      !normalizedName ||
+      !normalizedEmail ||
+      !normalizedPassword ||
+      !normalizedConfirmPassword ||
+      !normalizedPhone ||
+      !birthDate ||
+      !gender
+    ) {
       setErrorMessage('Please fill in all fields to continue.');
+      return;
+    }
+
+    if (!isValidPhone(normalizedPhone)) {
+      setErrorMessage('Please enter a valid phone number.');
       return;
     }
 
@@ -44,11 +75,21 @@ export default function SignUpScreen() {
     try {
       setIsSubmitting(true);
       setErrorMessage(null);
-      const result = await signUpWithEmail(normalizedName, normalizedEmail, normalizedPassword);
+
+      const result = await signUpWithEmail(
+        normalizedName,
+        normalizedEmail,
+        normalizedPassword,
+        normalizedPhone,
+        birthDate.toISOString(),
+        gender
+      );
+
       if (!result.ok) {
         setErrorMessage(result.message);
         return;
       }
+
       router.replace('/(tabs)/Scanscreen');
     } catch (error) {
       setErrorMessage(
@@ -75,7 +116,6 @@ export default function SignUpScreen() {
             <View style={styles.field}>
               <Text style={styles.label}>Full name</Text>
               <TextInput
-                accessibilityLabel="Full name input"
                 placeholder="Your name"
                 value={name}
                 onChangeText={setName}
@@ -86,7 +126,6 @@ export default function SignUpScreen() {
             <View style={styles.field}>
               <Text style={styles.label}>Email</Text>
               <TextInput
-                accessibilityLabel="Email input"
                 autoCapitalize="none"
                 autoComplete="email"
                 keyboardType="email-address"
@@ -98,9 +137,60 @@ export default function SignUpScreen() {
             </View>
 
             <View style={styles.field}>
+              <Text style={styles.label}>Phone number</Text>
+              <TextInput
+                placeholder="08xxxxxxxx"
+                keyboardType="phone-pad"
+                value={phone}
+                onChangeText={setPhone}
+                style={styles.input}
+              />
+            </View>
+
+            {/* ✅ Birth Date + Gender ใน 1 แถว */}
+            <View style={styles.row}>
+              <View style={[styles.field, styles.rowItem]}>
+                <Text style={styles.label}>Birth Date</Text>
+                <TouchableOpacity
+                  onPress={() => setShowDatePicker(true)}
+                  activeOpacity={0.8}
+                  style={styles.inputButton}
+                >
+                  <Text style={birthDate ? styles.inputButtonText : styles.placeholderText}>
+                    {birthDate ? birthDate.toLocaleDateString() : 'Select your birth date'}
+                  </Text>
+                </TouchableOpacity>
+                {showDatePicker && (
+                  <DateTimePicker
+                    value={birthDate ?? new Date(2000, 0, 1)}
+                    mode="date"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    onChange={onChangeBirthDate}
+                    maximumDate={new Date()}
+                  />
+                )}
+              </View>
+
+              <View style={[styles.field, styles.rowItem]}>
+                <Text style={styles.label}>Gender</Text>
+                <View style={styles.pickerWrapper}>
+                  <Picker
+                    selectedValue={gender}
+                    onValueChange={(value) => setGender(value)}
+                    style={styles.picker}
+                  >
+                    <Picker.Item label="Select" value="" />
+                    <Picker.Item label="Male" value="male" />
+                    <Picker.Item label="Female" value="female" />
+                    <Picker.Item label="Other" value="other" />
+                  </Picker>
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.field}>
               <Text style={styles.label}>Password</Text>
               <TextInput
-                accessibilityLabel="Password input"
                 placeholder="At least 6 characters"
                 secureTextEntry
                 value={password}
@@ -112,7 +202,6 @@ export default function SignUpScreen() {
             <View style={styles.field}>
               <Text style={styles.label}>Confirm password</Text>
               <TextInput
-                accessibilityLabel="Confirm password input"
                 placeholder="Re-enter your password"
                 secureTextEntry
                 value={confirmPassword}
@@ -135,6 +224,7 @@ export default function SignUpScreen() {
                 <Text style={styles.primaryButtonText}>Sign Up</Text>
               )}
             </TouchableOpacity>
+
             {errorMessage && <Text style={styles.errorText}>{errorMessage}</Text>}
 
             <TouchableOpacity
@@ -151,42 +241,16 @@ export default function SignUpScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  flex: {
-    flex: 1,
-  },
-  container: {
-    flexGrow: 1,
-    padding: 24,
-    justifyContent: 'center',
-  },
-  header: {
-    marginBottom: 32,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: '#101828',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#475467',
-  },
-  form: {
-    gap: 16,
-  },
-  field: {
-    gap: 8,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#344054',
-  },
+  safeArea: { flex: 1, backgroundColor: '#f5f5f5' },
+  flex: { flex: 1 },
+  container: { flexGrow: 1, padding: 24, justifyContent: 'center' },
+  header: { marginBottom: 32 },
+  title: { fontSize: 32, fontWeight: '700', color: '#101828', marginBottom: 8 },
+  subtitle: { fontSize: 16, color: '#475467' },
+  form: { gap: 16 },
+  field: { gap: 8 },
+  label: { fontSize: 14, fontWeight: '500', color: '#344054' },
+
   input: {
     borderWidth: 1,
     borderColor: '#D0D5DD',
@@ -197,6 +261,35 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#101828',
   },
+
+  row: { flexDirection: 'row', gap: 12 },          // ✅ แถว 2 ช่อง
+  rowItem: { flex: 1 },
+
+  inputButton: {
+    borderWidth: 1,
+    borderColor: '#D0D5DD',
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+    minHeight: 48,
+  },
+  inputButtonText: { fontSize: 16, color: '#101828' },
+  placeholderText: { fontSize: 16, color: '#98A2B3' },
+
+  pickerWrapper: {
+    borderWidth: 1,
+    borderColor: '#D0D5DD',
+    borderRadius: 12,
+    backgroundColor: '#fff',
+    overflow: 'hidden',
+  },
+  picker: {
+    height: 48,
+    color: '#101828',
+  },
+
   primaryButton: {
     backgroundColor: '#1D4ED8',
     paddingVertical: 16,
@@ -204,19 +297,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 8,
   },
-  primaryButtonDisabled: {
-    opacity: 0.75,
-  },
-  primaryButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  loadingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
+  primaryButtonDisabled: { opacity: 0.75 },
+  primaryButtonText: { color: '#fff', fontSize: 18, fontWeight: '600' },
+  loadingContainer: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   secondaryButton: {
     paddingVertical: 16,
     borderRadius: 12,
@@ -224,15 +307,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#98A2B3',
   },
-  secondaryButtonText: {
-    color: '#344054',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  errorText: {
-    color: '#B91C1C',
-    textAlign: 'center',
-    marginTop: 8,
-    fontWeight: '500',
-  },
+  secondaryButtonText: { color: '#344054', fontSize: 16, fontWeight: '600' },
+  errorText: { color: '#B91C1C', textAlign: 'center', marginTop: 8, fontWeight: '500' },
 });

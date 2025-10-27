@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { FirebaseApp, getApp, getApps, initializeApp } from 'firebase/app';
 import { Auth, Persistence, getAuth, initializeAuth } from 'firebase/auth';
+import { Firestore, getFirestore, initializeFirestore } from 'firebase/firestore';
 import { Platform } from 'react-native';
 
 const requiredEnv = [
@@ -47,6 +48,12 @@ const persistence =
 export const auth: Auth = alreadyInitialized
   ? getAuth(firebaseApp)
   : initializeAuth(firebaseApp, persistence ? { persistence } : undefined);
+
+export const db: Firestore = alreadyInitialized
+  ? getFirestore(firebaseApp)
+  : initializeFirestore(firebaseApp, {
+      experimentalForceLongPolling: true,
+    });
 
 function createReactNativePersistence(storage: typeof AsyncStorage): Persistence {
   const STORAGE_AVAILABLE_KEY = '__firebase_storage_available__';

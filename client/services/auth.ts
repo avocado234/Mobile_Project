@@ -5,8 +5,9 @@ import {
   signOut as firebaseSignOut,
   updateProfile,
 } from 'firebase/auth';
+import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
 
-import { auth } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 
 export type AuthResult = { ok: true } | { ok: false; message: string };
 
@@ -43,18 +44,35 @@ export async function signInWithEmail(email: string, password: string): Promise<
 export async function signUpWithEmail(
   name: string,
   email: string,
-  password: string
+  password: string,
+  phoneNumber: string,
+  birthDate: string,
+  gender: string
 ): Promise<AuthResult> {
   try {
     const { user } = await createUserWithEmailAndPassword(auth, email, password);
+
     if (name.trim()) {
       await updateProfile(user, { displayName: name.trim() });
     }
+
+    await setDoc(doc(db, 'users', user.uid), {
+      name: name.trim(),
+      email,
+      phoneNumber: phoneNumber.trim(),
+      birthDate,
+      gender,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+
     return { ok: true };
   } catch (error) {
     return { ok: false, message: getErrorMessage(error) };
   }
 }
+""
+
 
 export async function signOut(): Promise<void> {
   await firebaseSignOut(auth);
