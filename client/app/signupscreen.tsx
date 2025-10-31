@@ -57,6 +57,7 @@ export default function SignUpScreen() {
     const normalizedConfirmPassword = confirmPassword.trim();
     const normalizedPhone = phone.trim();
 
+
     if (
       !normalizedName ||
       !normalizedEmail ||
@@ -90,8 +91,9 @@ export default function SignUpScreen() {
         normalizedEmail,
         normalizedPassword,
         normalizedPhone,
+        birthDate.toISOString().split('T')[0],
         gender,
-        birthDate.toISOString().split('T')[0] // Format as YYYY-MM-DD
+        // Format as YYYY-MM-DD
       );
 
       if (!result.ok) {
@@ -167,7 +169,9 @@ export default function SignUpScreen() {
                 >
                   <Ionicons name="calendar-outline" size={20} color="#475467" />
                   <Text style={birthDate ? styles.inputText : styles.placeholder}>
-                    {birthDate ? birthDate.toLocaleDateString() : 'Select birth date'}
+                    {birthDate
+                      ? `${birthDate.getDate().toString().padStart(2, '0')}-${(birthDate.getMonth() + 1).toString().padStart(2, '0')}-${birthDate.getFullYear()}`
+                      : 'Select birth date'}
                   </Text>
                 </TouchableOpacity>
 

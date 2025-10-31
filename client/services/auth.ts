@@ -49,13 +49,24 @@ export async function signUpWithEmail(
   birthDate: string,
   gender: string
 ): Promise<AuthResult> {
-  try {
-    const { user } = await createUserWithEmailAndPassword(auth, email, password);
+  let user;
 
+  try {
+    // สร้าง user account
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    user = userCredential.user;
+
+    // Update profile
     if (name.trim()) {
       await updateProfile(user, { displayName: name.trim() });
     }
+  } catch (error) {
+    console.error('Auth error:', error);
+    return { ok: false, message: getErrorMessage(error) };
+  }
 
+  try {
+    // บันทึกข้อมูลลง Firestore
     await setDoc(doc(db, 'users', user.uid), {
       name: name.trim(),
       email,
@@ -68,12 +79,11 @@ export async function signUpWithEmail(
 
     return { ok: true };
   } catch (error) {
-    return { ok: false, message: getErrorMessage(error) };
+    console.error('Firestore error:', error);
+    // User account ถูกสร้างแล้ว แต่ Firestore ล้มเหลว
+    return { ok: false, message: 'Account created but failed to save profile. Please contact support.' };
   }
 }
-""
-
-
 export async function signOut(): Promise<void> {
   await firebaseSignOut(auth);
 }
