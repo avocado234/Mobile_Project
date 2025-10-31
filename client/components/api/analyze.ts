@@ -13,45 +13,64 @@ export type AnalyzeResult = {
   error?: string;
 };
 
-export async function analyzeImage(uri: string, extra: Record<string, string | number | boolean> = {}) {
+export async function analyzeImage(
+  uri: string,
+  extra: Record<string, string | number | boolean> = {},
+  timeoutMs = 60000
+) {
   const form = new FormData();
-  form.append("file", {
-    uri,
-    name: "hand.jpg",
-    type: "image/jpeg",
-  } as any);
 
-  // ใส่พารามิเตอร์ที่คุณอยากเปิดเป็นค่าเริ่มต้นให้ pipeline
-  const defaults = {
-    strong_enhance: 1,
-    detail_binary: 1,
-    rect_skeleton_kernel: 1,
-    min_component_pixels: 1,
-    prune_spur_iter: 3,
-    show_hand: 1,
+  // NOTE: ใน Expo/React Native ให้ส่งไฟล์แบบ object ดังนี้
+  form.append(
+    "file",
+    {
+      uri,
+      name: "hand.jpg",
+      type: "image/jpeg",
+    } as any
+  );
+
+  // ค่าเริ่มต้นแบบ "เบาเครื่อง" (จะ override ด้วย extra ได้)
+  const defaults: Record<string, any> = {
+    max_side: 900,
+    strong_enhance: 0,
+    detail_binary: 0,
+    rect_skeleton_kernel: 0,
+    min_component_pixels: 25,
+    prune_spur_iter: 2,
+    show_hand: 0,            // ปิด overlay มือเพื่อลดงาน
     hand_refine: "grabcut",
-    hand_alpha: 0.5,
-  } as Record<string, any>;
+    hand_alpha: 0.4,
+  };
 
   const payload = { ...defaults, ...extra };
   Object.entries(payload).forEach(([k, v]) => form.append(k, String(v)));
 
-  // หมายเหตุ: บน React Native/Expo ไม่ต้องตั้ง Content-Type เอง ให้ระบบเซ็ต boundary ให้
-  const resp = await fetch(`${BASE_URL}/analyze`, {
-    method: "POST",
-    body: form,
-  });
+  // ---- Timeout ด้วย AbortController ----
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
 
-  let json: AnalyzeResult | any = {};
   try {
-    json = await resp.json();
-  } catch {
-    throw new Error(`Bad response (${resp.status})`);
-  }
+    const resp = await fetch(`${BASE_URL}/analyze`, {
+      method: "POST",
+      body: form,
+      signal: ctrl.signal,
+    });
 
-  if (!resp.ok) {
-    throw new Error((json && (json.detail || json.error)) || `HTTP ${resp.status}`);
-  }
+    let json: AnalyzeResult | any = {};
+    try {
+      json = await resp.json();
+    } catch {
+      throw new Error(`Bad response (${resp.status})`);
+    }
 
-  return json as AnalyzeResult;
+    if (!resp.ok) {
+      // ดึงข้อความ error ที่เซิร์ฟเวอร์ส่งมา เพื่อดีบั๊กง่าย
+      throw new Error(json?.detail || json?.error || `HTTP ${resp.status}`);
+    }
+
+    return json as AnalyzeResult;
+  } finally {
+    clearTimeout(timer);
+  }
 }
