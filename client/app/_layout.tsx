@@ -7,7 +7,10 @@ import { useEffect } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import 'react-native-reanimated';
 
+
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
+import { Provider } from 'react-redux';
+import { store } from '@/redux/store';
 import { useColorScheme } from '../components/useColorScheme';
 
 export {
@@ -39,18 +42,22 @@ export default function RootLayout() {
     return null;
   }
 
-  return <RootLayoutNav />;
+  return (
+    <Provider store={store}>
+      <AuthProvider>
+        <RootLayoutNav />
+      </AuthProvider>
+    </Provider>
+  );
 }
 
 function RootLayoutNav() {
   const colorScheme = useColorScheme();
 
   return (
-    <AuthProvider>
-      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-        <AuthStack />
-      </ThemeProvider>
-    </AuthProvider>
+    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+      <AuthStack />
+    </ThemeProvider>
   );
 }
 

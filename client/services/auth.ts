@@ -5,8 +5,9 @@ import {
   signOut as firebaseSignOut,
   updateProfile,
 } from 'firebase/auth';
+import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
 
-import { auth } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 
 export type AuthResult = { ok: true } | { ok: false; message: string };
 
@@ -43,19 +44,46 @@ export async function signInWithEmail(email: string, password: string): Promise<
 export async function signUpWithEmail(
   name: string,
   email: string,
-  password: string
+  password: string,
+  phoneNumber: string,
+  birthDate: string,
+  gender: string
 ): Promise<AuthResult> {
+  let user;
+
   try {
-    const { user } = await createUserWithEmailAndPassword(auth, email, password);
+    // สร้าง user account
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    user = userCredential.user;
+
+    // Update profile
     if (name.trim()) {
       await updateProfile(user, { displayName: name.trim() });
     }
-    return { ok: true };
   } catch (error) {
+    console.error('Auth error:', error);
     return { ok: false, message: getErrorMessage(error) };
   }
-}
 
+  try {
+    // บันทึกข้อมูลลง Firestore
+    await setDoc(doc(db, 'users', user.uid), {
+      name: name.trim(),
+      email,
+      phoneNumber: phoneNumber.trim(),
+      birthDate,
+      gender,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+
+    return { ok: true };
+  } catch (error) {
+    console.error('Firestore error:', error);
+    // User account ถูกสร้างแล้ว แต่ Firestore ล้มเหลว
+    return { ok: false, message: 'Account created but failed to save profile. Please contact support.' };
+  }
+}
 export async function signOut(): Promise<void> {
   await firebaseSignOut(auth);
 }
