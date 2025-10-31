@@ -18,6 +18,7 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
+        headerShown: false,
       
         // Disable the static render of the header on web
         // to prevent a hydration error in React Navigation v6.
