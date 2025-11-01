@@ -100,16 +100,45 @@ def _binary_to_rle(binary: np.ndarray) -> Dict[str, Any]:
     return {"height": int(h), "width": int(w), "start": 1 if int(flat[0])>0 else 0, "counts": counts}
 
 # ================= Hand ROI / Landmarks =================
-def detect_landmarks(img_bgr: np.ndarray) -> Optional[List[Tuple[int,int]]]:
-    if mp_hands is None:
-        # ไม่มี mediapipe -> ให้ error ที่อ่านง่าย
+def detect_landmarks(img_bgr):
+    """
+    คืนพิกัดแลนด์มาร์คมือเป็น list[(x, y)] ถ้าหาไม่เจอหรือ mediapipe มีปัญหา -> คืน None
+    """
+    if img_bgr is None or img_bgr.size == 0:
         return None
+
     h, w = img_bgr.shape[:2]
-    with mp_hands.Hands(static_image_mode=True, max_num_hands=1, min_detection_confidence=0.45) as hands:
-        r = hands.process(cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB))
-    if not r.multi_hand_landmarks: return None
-    lms = r.multi_hand_landmarks[0].landmark
-    return [(int(l.x*w), int(l.y*h)) for l in lms]
+
+    # กัน import mediapipe ล้ม (เช่น protobuf mismatch)
+    try:
+        import mediapipe as mp
+    except Exception:
+        return None
+
+    try:
+        rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
+    except Exception:
+        return None
+
+    try:
+        with mp.solutions.hands.Hands(
+            static_image_mode=True,
+            max_num_hands=1,
+            model_complexity=0,            # เร็วขึ้น
+            min_detection_confidence=0.5,
+            min_tracking_confidence=0.5
+        ) as hands:
+            res = hands.process(rgb)
+
+        if not res or not getattr(res, "multi_hand_landmarks", None):
+            return None
+
+        lm0 = res.multi_hand_landmarks[0].landmark
+        pts = [(int(lm.x * w), int(lm.y * h)) for lm in lm0]
+        return pts
+    except Exception:
+        return None
+
 
 def hand_mask_from_landmarks(img_bgr: np.ndarray, land: List[Tuple[int,int]]) -> np.ndarray:
     h, w = img_bgr.shape[:2]
