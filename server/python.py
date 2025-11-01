@@ -394,7 +394,7 @@ def analyze(img_bgr: np.ndarray, outdir="debug_out", Cfg: PipeConfig = PipeConfi
 
     land = detect_landmarks(small)
     if land is None:
-        return {"error":"Hand not detected (or mediapipe not installed). Use a clear palm-up photo or install mediapipe."}
+        return {"error":"Hand not detected."}
 
     # ROI robust
     mask_full = hand_mask_from_landmarks(small, land)
@@ -517,20 +517,17 @@ def _finger_ratios(land_full: List[Tuple[int,int]]) -> Dict[str,float]:
         ratios[k]= _euclid(mcp[k], tip[k]) / hand_len if hand_len>1 else 0.0
     return ratios
 
-# ================= CLI =================
 if __name__ == "__main__":
     import argparse
     ap = argparse.ArgumentParser()
     ap.add_argument("--path", default="Hand.jpg")
     ap.add_argument("--outdir", default="debug_out")
 
-    # mode switches (ตั้ง default ให้ “ทำงานเหมือนที่คุณใส่ flag บ่อยๆ”)
     ap.add_argument("--strong_enhance", type=int, default=1)
     ap.add_argument("--detail_binary", type=int, default=1)
     ap.add_argument("--use_frangi", type=int, default=0)
     ap.add_argument("--rect_skeleton_kernel", type=int, default=1)
 
-    # params
     ap.add_argument("--max_side", type=int, default=MAX_SIDE_DEFAULT)
     ap.add_argument("--clahe_clip", type=float, default=CLAHE_CLIP_DEFAULT)
     ap.add_argument("--block_size", type=int, default=31)
@@ -541,7 +538,6 @@ if __name__ == "__main__":
     ap.add_argument("--prune_spur_iter", type=int, default=PRUNE_SPUR_ITER_DEFAULT)
     ap.add_argument("--frangi_thresh", type=float, default=0.05)
 
-    # whole-hand segmentation options
     ap.add_argument("--show_hand", type=int, default=1)
     ap.add_argument("--hand_refine", type=str, default="grabcut", choices=["none","morph","skin","grabcut"])
     ap.add_argument("--hand_alpha", type=float, default=0.5)

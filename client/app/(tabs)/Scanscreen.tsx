@@ -4,13 +4,11 @@ import { CameraView, useCameraPermissions, type FlashMode } from "expo-camera";
 import * as MediaLibrary from "expo-media-library";
 import LoadingScreen from "../../components/LoadingScreen.native";
 import { analyzeImage } from "../../components/api/analyze";
+import { API_BASE } from "../../utils/constants";
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-// ตั้งให้ตรงกับเครื่องที่รัน Flask
-const API_BASE = "http://10.64.40.252:8000";
-
-// POST บันทึกผลวิเคราะห์ลง Firestore ผ่าน Flask
+// --- POST: บันทึกผลวิเคราะห์ลง Firestore ผ่าน Flask (/scan/save)
 async function saveResultToDB(
   analyzeResult: any,
   meta: Record<string, any> = {},
@@ -21,11 +19,27 @@ async function saveResultToDB(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ user_id: userId, analyze_result: analyzeResult, meta }),
   });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err?.error || `save failed (${res.status})`);
-  }
-  return res.json() as Promise<{ id: string }>;
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json?.error || `save failed (${res.status})`);
+  return json as { id: string };
+}
+
+// --- POST: ทำนายดวงจาก scan_id (/fortune/predict)
+async function predictFortune(
+  scanId: string,
+  userId: string = "demo-user",
+  language: "th" | "en" = "th",
+  style: "friendly" | "formal" = "friendly",
+  model = "deepseek-chat"
+) {
+  const res = await fetch(`${API_BASE}/fortune/predict`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ scan_id: scanId, user_id: userId, language, style, model }),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json?.error || `predict failed (${res.status})`);
+  return json as { fortune_id: string; answer: string };
 }
 
 export default function CameraScreen() {
@@ -38,13 +52,10 @@ export default function CameraScreen() {
 
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [showLoading, setShowLoading] = useState(false);
-  const loadingMs = 3500; // โหลดแค่พอมี feedback
+  const loadingMs = 4000; // ให้พอครอบคลุม analyze+save+predict
 
   useEffect(() => {
-    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
-      if (showLoading) return true;
-      return false;
-    });
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => (showLoading ? true : false));
     return () => sub.remove();
   }, [showLoading]);
 
@@ -76,17 +87,16 @@ export default function CameraScreen() {
       }
 
       try {
-        // วิเคราะห์ (ไม่แสดงรายละเอียด) + โชว์โหลด + บันทึก DB
-        const [analyzeJson] = await Promise.all([
-          analyzeImage(photo.uri), // เรียก Flask /analyze
-          wait(loadingMs),
-        ]);
+        const [analyzeJson] = await Promise.all([analyzeImage(photo.uri), wait(loadingMs)]);
 
-        await saveResultToDB(analyzeJson, { device: "expo", facing, flash, torch });
+        const { id: scanId } = await saveResultToDB(analyzeJson, { device: "expo", facing, flash, torch });
+
+        const { answer } = await predictFortune(scanId, "demo-user", "th", "friendly", "deepseek-chat");
+
         setPhotoUri(photo.uri);
-        Alert.alert("บันทึกสำเร็จ", "อัปโหลดข้อมูลสแกนเรียบร้อยแล้ว");
+
       } catch (e: any) {
-        Alert.alert("วิเคราะห์/บันทึกไม่สำเร็จ", e?.message ?? String(e));
+        Alert.alert("ทำนายไม่สำเร็จ", e?.message ?? String(e));
       } finally {
         setShowLoading(false);
       }
@@ -105,13 +115,13 @@ export default function CameraScreen() {
         return;
       }
       await MediaLibrary.saveToLibraryAsync(photoUri);
-      Alert.alert("บันทึกแล้ว", "รูปถูกบันทึกในคลังภาพของคุณ");
+      Alert.alert("บันทึกแล้ว!!", "รูปถูกบันทึกในคลังภาพของคุณ");
     } catch (e: any) {
       Alert.alert("บันทึกไม่สำเร็จ", e?.message ?? String(e));
     }
   };
 
-  // โหมดพรีวิวรูป (ไม่มีรายละเอียดผลวิเคราะห์)
+  // โหมดพรีวิวรูป
   if (photoUri) {
     return (
       <View style={{ flex: 1, backgroundColor: "#000" }}>
@@ -127,21 +137,12 @@ export default function CameraScreen() {
   // โหมดกล้อง
   return (
     <View style={{ flex: 1, backgroundColor: "#000" }}>
-      <CameraView
-        ref={cameraRef}
-        style={{ flex: 1 }}
-        facing={facing}
-        flash={flash}
-        enableTorch={torch}
-      />
+      <CameraView ref={cameraRef} style={{ flex: 1 }} facing={facing} flash={flash} enableTorch={torch} />
 
-      {/* ท็อปบาร์: แฟลช / ไฟฉาย */}
       <View style={styles.topBar}>
         <TouchableOpacity
           style={styles.topBtn}
-          onPress={() =>
-            setFlash((f) => (f === "off" ? "on" : f === "on" ? "auto" : "off"))
-          }
+          onPress={() => setFlash((f) => (f === "off" ? "on" : f === "on" ? "auto" : "off"))}
         >
           <Text style={styles.topBtnText}>Flash: {flash}</Text>
         </TouchableOpacity>
@@ -151,7 +152,6 @@ export default function CameraScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* บาร์ล่าง: ซ้ายสลับกล้อง / กลางชัตเตอร์ */}
       <View style={styles.bottomBar}>
         <TouchableOpacity style={styles.sideBtn} onPress={() => setFacing((f) => (f === "back" ? "front" : "back"))}>
           <Text style={styles.sideBtnText}>สลับ</Text>
@@ -164,7 +164,6 @@ export default function CameraScreen() {
         <View style={styles.sideBtn} />
       </View>
 
-      {/* โอเวอร์เลย์ Loading */}
       {showLoading && (
         <View style={styles.loadingOverlay} pointerEvents="auto">
           <LoadingScreen company="Horo App" durationMs={loadingMs} />
