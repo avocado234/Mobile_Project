@@ -5,3 +5,4 @@ numpy
 Pillow
 mediapipe
 scikit-image
+requests
