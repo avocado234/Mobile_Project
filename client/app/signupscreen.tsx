@@ -4,7 +4,7 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
-  SafeAreaView,
+
   ScrollView,
   StyleSheet,
   Text,
@@ -15,7 +15,9 @@ import {
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import DropDownPicker from 'react-native-dropdown-picker';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { signUpWithEmail } from '@/services/auth';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function SignUpScreen() {
   const router = useRouter();
@@ -25,14 +27,15 @@ export default function SignUpScreen() {
   const [phone, setPhone] = useState('');
   const [birthDate, setBirthDate] = useState<Date | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  // ✅ Gender dropdown state
   const [genderOpen, setGenderOpen] = useState(false);
   const [gender, setGender] = useState<string | null>(null);
   const [genderItems, setGenderItems] = useState([
-    { label: 'Male', value: 'male' },
-    { label: 'Female', value: 'female' },
-    { label: 'Other', value: 'other' },
+    { label: 'male', value: 'male' },
+    { label: 'female', value: 'female' },
+
   ]);
 
   const [password, setPassword] = useState('');
@@ -57,7 +60,6 @@ export default function SignUpScreen() {
     const normalizedConfirmPassword = confirmPassword.trim();
     const normalizedPhone = phone.trim();
 
-
     if (
       !normalizedName ||
       !normalizedEmail ||
@@ -67,17 +69,17 @@ export default function SignUpScreen() {
       !birthDate ||
       !gender
     ) {
-      setErrorMessage('Please fill in all fields to continue.');
+      setErrorMessage('please fill in all fields');
       return;
     }
 
     if (!isValidPhone(normalizedPhone)) {
-      setErrorMessage('Please enter a valid phone number.');
+      setErrorMessage(' invalid phone number ');
       return;
     }
 
     if (normalizedPassword !== normalizedConfirmPassword) {
-      setErrorMessage('Passwords do not match. Please try again.');
+      setErrorMessage('passwords do not match');
       return;
     }
 
@@ -85,15 +87,13 @@ export default function SignUpScreen() {
       setIsSubmitting(true);
       setErrorMessage(null);
 
-      // ✅ คุณสามารถแก้ service ให้เก็บ gender/birthDate/phone เพิ่มเติมได้
       const result = await signUpWithEmail(
         normalizedName,
         normalizedEmail,
         normalizedPassword,
         normalizedPhone,
-        birthDate.toISOString().split('T')[0],
+        `${birthDate.getDate().toString().padStart(2, '0')}-${(birthDate.getMonth() + 1).toString().padStart(2, '0')}-${birthDate.getFullYear()}`,
         gender,
-        // Format as YYYY-MM-DD
       );
 
       if (!result.ok) {
@@ -104,7 +104,7 @@ export default function SignUpScreen() {
       router.replace('/(tabs)/Scanscreen');
     } catch (error) {
       setErrorMessage(
-        error instanceof Error ? error.message : 'Something went wrong. Please try again.'
+        error instanceof Error ? error.message :  'Please try again in a moment.'
       );
     } finally {
       setIsSubmitting(false);
@@ -112,218 +112,436 @@ export default function SignUpScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-          <View style={styles.header}>
-            <Text style={styles.title}>Create a new account</Text>
-            <Text style={styles.subtitle}>Register to get started with the app.</Text>
-          </View>
-
-          <View style={styles.form}>
-            <View style={styles.field}>
-              <Text style={styles.label}>Full name</Text>
-              <TextInput
-                placeholder="Your name"
-                value={name}
-                onChangeText={setName}
-                style={styles.input}
-              />
+    <LinearGradient colors={['#1a0b2e', '#2d1b4e', '#1a0b2e']} style={styles.gradient}>
+      <SafeAreaView style={styles.safeArea}>
+        <KeyboardAvoidingView
+          style={styles.flex}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <View style={styles.container} >
+            {/* Decorative Stars */}
+            <View style={styles.starsContainer}>
+              <Ionicons name="star" size={14} color="#B794F6" style={[styles.star, styles.star1]} />
+              <Ionicons name="star" size={14} color="#E9D5FF" style={[styles.star, styles.star2]} />
+              
             </View>
 
-            <View style={styles.field}>
-              <Text style={styles.label}>Email</Text>
-              <TextInput
-                autoCapitalize="none"
-                autoComplete="email"
-                keyboardType="email-address"
-                placeholder="example@email.com"
-                value={email}
-                onChangeText={setEmail}
-                style={styles.input}
-              />
-            </View>
+            {/* Header */}
+            <View style={styles.header}>
 
-            <View style={styles.field}>
-              <Text style={styles.label}>Phone number</Text>
-              <TextInput
-                placeholder="08xxxxxxxx"
-                keyboardType="phone-pad"
-                value={phone}
-                onChangeText={setPhone}
-                style={styles.input}
-              />
-            </View>
+              <Text style={styles.title}> Register </Text>
 
-            {/* ✅ Birth Date + Gender */}
-            <View style={styles.row}>
-              <View style={[styles.field, styles.rowItem]}>
-                <Text style={styles.label}>Birth Date</Text>
-                <TouchableOpacity
-                  onPress={() => setShowDatePicker(true)}
-                  activeOpacity={0.8}
-                  style={styles.inputButton}
-                >
-                  <Ionicons name="calendar-outline" size={20} color="#475467" />
-                  <Text style={birthDate ? styles.inputText : styles.placeholder}>
-                    {birthDate
-                      ? `${birthDate.getDate().toString().padStart(2, '0')}-${(birthDate.getMonth() + 1).toString().padStart(2, '0')}-${birthDate.getFullYear()}`
-                      : 'Select birth date'}
-                  </Text>
-                </TouchableOpacity>
+            </View >
 
-                {showDatePicker && (
-                  <DateTimePicker
-                    value={birthDate ?? new Date(2000, 0, 1)}
-                    mode="date"
-                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                    onChange={onChangeBirthDate}
-                    maximumDate={new Date()}
-                  />
-                )}
-              </View>
+            {/* Form Card */}
+            <View style={styles.formCard}>
+              <LinearGradient
+                colors={['rgba(167, 139, 250, 0.1)', 'rgba(196, 181, 253, 0.05)']}
+                style={styles.cardGradient}
+              >
+                <View style={styles.form}>
+                  {/* Name Field */}
+                  <View style={styles.field}>
+                    <Text style={styles.label}>
+                      User
+                    </Text>
+                    <View style={styles.inputContainer}>
 
-              <View style={[styles.field, styles.rowItem, { zIndex: 10 }]}>
-                <Text style={styles.label}>Gender</Text>
-                <DropDownPicker
-                  open={genderOpen}
-                  value={gender}
-                  items={genderItems}
-                  setOpen={setGenderOpen}
-                  setValue={setGender}
-                  setItems={setGenderItems}
-                  placeholder="Select gender"
-                  style={styles.dropdown}
-                  dropDownContainerStyle={styles.dropdownContainer}
-                  textStyle={styles.inputText}
-                  placeholderStyle={styles.placeholder}
-                  listMode="SCROLLVIEW"
-                />
-              </View>
-            </View>
+                      <TextInput
+                        placeholder="user name"
+                        placeholderTextColor="#9CA3AF"
+                        value={name}
+                        onChangeText={setName}
+                        style={styles.input}
+                      />
+                    </View>
+                  </View>
 
-            <View style={styles.field}>
-              <Text style={styles.label}>Password</Text>
-              <TextInput
-                placeholder="At least 6 characters"
-                secureTextEntry
-                value={password}
-                onChangeText={setPassword}
-                style={styles.input}
-              />
-            </View>
+                  {/* Email Field */}
+                  <View style={styles.field}>
+                    <Text style={styles.label}>
+                      Email
+                    </Text>
+                    <View style={styles.inputContainer}>
 
-            <View style={styles.field}>
-              <Text style={styles.label}>Confirm password</Text>
-              <TextInput
-                placeholder="Re-enter your password"
-                secureTextEntry
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-                style={styles.input}
-              />
-            </View>
+                      <TextInput
+                        autoCapitalize="none"
+                        autoComplete="email"
+                        keyboardType="email-address"
+                        placeholder="example@email.com"
+                        placeholderTextColor="#9CA3AF"
+                        value={email}
+                        onChangeText={setEmail}
+                        style={styles.input}
+                      />
+                    </View>
+                  </View>
 
-            <TouchableOpacity
-              style={[styles.primaryButton, isSubmitting && styles.primaryButtonDisabled]}
-              onPress={handleSignUp}
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? (
-                <View style={styles.loadingContainer}>
-                  <ActivityIndicator color="#fff" />
-                  <Text style={styles.primaryButtonText}>Creating account...</Text>
+                  {/* Phone Field */}
+                  <View style={styles.field}>
+                    <Text style={styles.label}>
+                      Phone
+                    </Text>
+                    <View style={styles.inputContainer}>
+
+                      <TextInput
+                        placeholder="08xxxxxxxx"
+                        placeholderTextColor="#9CA3AF"
+                        keyboardType="phone-pad"
+                        value={phone}
+                        onChangeText={setPhone}
+                        style={styles.input}
+                      />
+                    </View>
+                  </View>
+
+                  {/* Birth Date + Gender Row */}
+                  <View style={styles.row}>
+                    {/* Birth Date */}
+                    <View style={[styles.field, styles.rowItem]}>
+                      <Text style={styles.label}>
+                        Birthday
+                      </Text>
+                      <TouchableOpacity
+                        onPress={() => setShowDatePicker(true)}
+                        activeOpacity={0.8}
+                        style={styles.inputButton}
+                      >
+                        <Ionicons name="calendar" size={16} color="#A78BFA" />
+                        <Text style={birthDate ? styles.inputText : styles.placeholder}>
+                          {birthDate
+                            ? `${birthDate.getDate().toString().padStart(2, '0')}-${(birthDate.getMonth() + 1).toString().padStart(2, '0')}-${birthDate.getFullYear()}`
+                            : 'date'}
+                        </Text>
+                      </TouchableOpacity>
+
+                      {showDatePicker && (
+                        <DateTimePicker
+                          value={birthDate ?? new Date(2000, 0, 1)}
+                          mode="date"
+                          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                          onChange={onChangeBirthDate}
+                          maximumDate={new Date()}
+                        />
+                      )}
+                    </View>
+
+                    {/* Gender */}
+                    <View style={[styles.field, styles.rowItem, { zIndex: 10 }]}>
+                      <Text style={styles.label}>
+                        Gender
+                      </Text>
+                      <DropDownPicker
+                        open={genderOpen}
+                        value={gender}
+                        items={genderItems}
+                        setOpen={setGenderOpen}
+                        setValue={setGender}
+                        setItems={setGenderItems}
+                        placeholder=" gender "
+                        style={styles.dropdown}
+                        dropDownContainerStyle={styles.dropdownContainer}
+                        textStyle={styles.dropdownText}
+                        placeholderStyle={styles.dropdownPlaceholder}
+                        listMode="SCROLLVIEW"
+                        ArrowDownIconComponent={() => (
+                          <Ionicons name="chevron-down" size={20} color="#A78BFA" />
+                        )}
+                        ArrowUpIconComponent={() => (
+                          <Ionicons name="chevron-up" size={20} color="#A78BFA" />
+                        )}
+                      />
+                    </View>
+                  </View>
+
+                  {/* Password Field */}
+                  <View style={styles.field}>
+                    <Text style={styles.label}>
+                       Password
+                    </Text>
+                    <View style={styles.inputContainer}>
+                     
+                      <TextInput
+                        placeholder= " password"
+                        placeholderTextColor="#9CA3AF"
+                        secureTextEntry={!showPassword}
+                        value={password}
+                        onChangeText={setPassword}
+                        style={styles.input}
+                      />
+                      <TouchableOpacity
+                        onPress={() => setShowPassword(!showPassword)}
+                        style={styles.eyeIcon}
+                      >
+                        <Ionicons
+                          name={showPassword ? "eye-outline" : "eye-off-outline"}
+                          size={20}
+                          color="#A78BFA"
+                        />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  {/* Confirm Password Field */}
+                  <View style={styles.field}>
+                    <Text style={styles.label}>
+                       Confirm Password
+                    </Text>
+                    <View style={styles.inputContainer}>
+                     
+                      <TextInput
+                        placeholder="Confirm Password"
+                        placeholderTextColor="#9CA3AF"
+                        secureTextEntry={!showConfirmPassword}
+                        value={confirmPassword}
+                        onChangeText={setConfirmPassword}
+                        style={styles.input}
+                      />
+                      <TouchableOpacity
+                        onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                        style={styles.eyeIcon}
+                      >
+                        <Ionicons
+                          name={showConfirmPassword ? "eye-outline" : "eye-off-outline"}
+                          size={20}
+                          color="#A78BFA"
+                        />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  {/* Sign Up Button */}
+                  <TouchableOpacity
+                    onPress={handleSignUp}
+                    disabled={isSubmitting}
+                    activeOpacity={0.8}
+                  >
+                    <LinearGradient
+                      colors={isSubmitting ? ['#6B7280', '#4B5563'] : ['#8B5CF6', '#7C3AED']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={[styles.primaryButton, isSubmitting && styles.primaryButtonDisabled]}
+                    >
+                      {isSubmitting ? (
+                        <View style={styles.loadingContainer}>
+                          <ActivityIndicator color="#fff" />
+                          <Text style={styles.primaryButtonText}>  </Text>
+                        </View>
+                      ) : (
+                        <View style={styles.buttonContent}>
+                          
+                          <Text style={styles.primaryButtonText}> create account </Text>
+                         
+                        </View>
+                      )}
+                    </LinearGradient>
+                  </TouchableOpacity>
+
+                  {/* Error Message */}
+                  {errorMessage && (
+                    <View style={styles.errorContainer}>
+                      <Ionicons name="alert-circle" size={16} color="#F87171" />
+                      <Text style={styles.errorText}>{errorMessage}</Text>
+                    </View>
+                  )}
+
+                  {/* Back to Sign In */}
+                  <TouchableOpacity
+                    style={styles.secondaryButton}
+                    onPress={() => router.replace('/signinscreen')}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="arrow-back" size={18} color="#C4B5FD" />
+                    <Text style={styles.secondaryButtonText}> back to sign in</Text>
+                  </TouchableOpacity>
                 </View>
-              ) : (
-                <Text style={styles.primaryButtonText}>Sign Up</Text>
-              )}
-            </TouchableOpacity>
-
-            {errorMessage && <Text style={styles.errorText}>{errorMessage}</Text>}
-
-            <TouchableOpacity
-              style={styles.secondaryButton}
-              onPress={() => router.replace('/signinscreen')}
-            >
-              <Text style={styles.secondaryButtonText}>Back to sign in</Text>
-            </TouchableOpacity>
+              </LinearGradient>
+            </View>
           </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#f5f5f5' },
+  gradient: { flex: 1 },
+  safeArea: { flex: 1 },
   flex: { flex: 1 },
-  container: { flexGrow: 1, padding: 24, justifyContent: 'center' },
-  header: { marginBottom: 32 },
-  title: { fontSize: 32, fontWeight: '700', color: '#101828', marginBottom: 8 },
-  subtitle: { fontSize: 16, color: '#475467' },
-  form: { gap: 16 },
-  field: { gap: 8 },
-  label: { fontSize: 14, fontWeight: '500', color: '#344054' },
-
-  input: {
-    borderWidth: 1,
-    borderColor: '#D0D5DD',
-    borderRadius: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    backgroundColor: '#fff',
-    fontSize: 16,
-    color: '#101828',
+  container: { flexGrow: 1, padding: 24, paddingTop: 10, paddingBottom: 10, justifyContent: 'center' },
+  starsContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
-
-  row: { flexDirection: 'row', gap: 12 },
-  rowItem: { flex: 1 },
-
-  inputButton: {
+  star: { position: 'absolute' },
+  star1: { top: '8%', left: '10%', opacity: 0.8 },
+  star2: { top: '5%', right: '15%', opacity: 0.6 },
+  
+  header: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  sparkleContainer: {
+    position: 'relative',
+    marginBottom: 12,
+  },
+  sparkleGlow: {
+    position: 'absolute',
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: '#E9D5FF',
+    opacity: 0.2,
+    top: -15,
+    left: -15,
+  },
+  title: {
+    fontSize: 32,
+    fontWeight: '800',
+    color: '#E9D5FF',
+    marginBottom: 8,
+    textShadowColor: 'rgba(167, 139, 250, 0.5)',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 20,
+    letterSpacing: 1.5,
+  },
+  subtitle: {
+    fontSize: 13,
+    color: '#C4B5FD',
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+  formCard: {
+    borderRadius: 24,
+    overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#D0D5DD',
-    borderRadius: 12,
+    borderColor: 'rgba(167, 139, 250, 0.3)',
+    shadowColor: '#8B5CF6',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  cardGradient: {
+    padding: 20,
+    backgroundColor: 'rgba(26, 11, 46, 1)',
+  },
+  form: { gap: 16 },
+  field: { gap: 6 },
+  label: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#E9D5FF',
+    marginLeft: 4,
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: 'rgba(167, 139, 250, 0.3)',
+    borderRadius: 14,
+    backgroundColor: 'rgba(26, 11, 46, 0.5)',
+    paddingHorizontal: 14,
+  },
+  inputIcon: { marginRight: 10 },
+  input: {
+    flex: 1,
     paddingVertical: 14,
-    paddingHorizontal: 16,
-    backgroundColor: '#fff',
+    fontSize: 15,
+    color: '#E9D5FF',
+  },
+  eyeIcon: { padding: 8 },
+  row: { flexDirection: 'row', gap: 10 },
+  rowItem: { flex: 1 },
+  inputButton: {
+    borderWidth: 1.5,
+    borderColor: 'rgba(167, 139, 250, 0.3)',
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    backgroundColor: 'rgba(26, 11, 46, 0.5)',
     flexDirection: 'row',
     alignItems: 'center',
     minHeight: 48,
   },
-  inputText: { fontSize: 16, color: '#101828', marginLeft: 8 },
-  placeholder: { fontSize: 16, color: '#98A2B3', marginLeft: 8 },
-
+  inputText: { fontSize: 15, color: '#E9D5FF', marginLeft: 10 },
+  placeholder: { fontSize: 15, color: '#9CA3AF', marginLeft: 10 },
   dropdown: {
-    borderColor: '#D0D5DD',
-    borderRadius: 12,
-    backgroundColor: '#fff',
+    borderWidth: 1.5,
+    borderColor: 'rgba(167, 139, 250, 0.3)',
+    borderRadius: 14,
+    backgroundColor: 'rgba(26, 11, 46, 0.5)',
     minHeight: 48,
   },
   dropdownContainer: {
-    borderColor: '#D0D5DD',
-    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: 'rgba(167, 139, 250, 0.3)',
+    borderRadius: 14,
+    backgroundColor: '#2d1b4e',
   },
-
+  dropdownText: { fontSize: 15, color: '#E9D5FF' },
+  dropdownPlaceholder: { fontSize: 15, color: '#9CA3AF' },
   primaryButton: {
-    backgroundColor: '#1D4ED8',
     paddingVertical: 16,
-    borderRadius: 12,
+    borderRadius: 14,
     alignItems: 'center',
     marginTop: 8,
+    shadowColor: '#8B5CF6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 6,
   },
-  primaryButtonDisabled: { opacity: 0.75 },
-  primaryButtonText: { color: '#fff', fontSize: 18, fontWeight: '600' },
-  loadingContainer: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  secondaryButton: {
-    paddingVertical: 16,
-    borderRadius: 12,
+  primaryButtonDisabled: { opacity: 0.6 },
+  buttonContent: {
+    flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#98A2B3',
+    gap: 10,
   },
-  secondaryButtonText: { color: '#344054', fontSize: 16, fontWeight: '600' },
-  errorText: { color: '#B91C1C', textAlign: 'center', marginTop: 8, fontWeight: '500' },
+  primaryButtonText: {
+    color: '#fff',
+    fontSize: 17,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(248, 113, 113, 0.1)',
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(248, 113, 113, 0.3)',
+  },
+  errorText: {
+    color: '#FCA5A5',
+    fontSize: 13,
+    fontWeight: '500',
+    flex: 1,
+  },
+  secondaryButton: {
+    paddingVertical: 14,
+    borderRadius: 14,
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: 'rgba(167, 139, 250, 0.3)',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(167, 139, 250, 0.05)',
+  },
+  secondaryButtonText: {
+    color: '#C4B5FD',
+    fontSize: 15,
+    fontWeight: '600',
+  },
 });

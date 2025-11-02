@@ -29,7 +29,7 @@ export default function SignInScreen() {
         const normalizedPassword = password.trim();
 
         if (!normalizedEmail || !normalizedPassword) {
-            setErrorMessage('กรุณากรอกอีเมลและรหัสผ่าน');
+            setErrorMessage(' Pleass enter email and password');
             return;
         }
 
@@ -44,7 +44,7 @@ export default function SignInScreen() {
             router.replace('/(tabs)/Scanscreen');
         } catch (error) {
             setErrorMessage(
-                error instanceof Error ? error.message : 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง'
+                error instanceof Error ? error.message :  ' An unexpected error occurred. Please try again.'
             );
         } finally {
             setIsLoading(false);
@@ -77,7 +77,7 @@ export default function SignInScreen() {
                             <View style={styles.moonGlow} />
                         </View>
                         <Text style={styles.title}>Mee Duang</Text>
-                        <Text style={styles.subtitle}>เปิดเผยดวงชะตา ผ่านลายมือของคุณ</Text>
+                        <Text style={styles.subtitle}>Reveal your destiny through your palmistry.</Text>
                     </View>
 
                     {/* Form Card */}
@@ -152,13 +152,13 @@ export default function SignInScreen() {
                                         {isLoading ? (
                                             <View style={styles.loadingContainer}>
                                                 <ActivityIndicator color="#fff" />
-                                                <Text style={styles.primaryButtonText}>กำลังเข้าสู่ระบบ...</Text>
+                                                <Text style={styles.primaryButtonText}> loading... </Text>
                                             </View>
                                         ) : (
                                             <View style={styles.buttonContent}>
-                                                <Ionicons name="sparkles" size={20} color="#fff" />
-                                                <Text style={styles.primaryButtonText}>เข้าสู่ระบบ</Text>
-                                                <Ionicons name="arrow-forward" size={20} color="#fff" />
+                                              
+                                                <Text style={styles.primaryButtonText}> Sign In</Text>
+                                                
                                             </View>
                                         )}
                                     </LinearGradient>
@@ -177,10 +177,11 @@ export default function SignInScreen() {
 
                     {/* Footer */}
                     <View style={styles.footer}>
-                        <Text style={styles.footerText}>ยังไม่มีบัญชี?</Text>
+                        <Text style={styles.footerText}> Don't have an account? </Text>
+                        
                         <TouchableOpacity onPress={() => router.push('./signupscreen')}>
                             
-                                <Text style={styles.link}>สร้างบัญชีใหม่</Text>
+                                <Text style={styles.link}> sign up </Text>
                             
                         </TouchableOpacity>
                     </View>
@@ -376,7 +377,7 @@ const styles = StyleSheet.create({
         color: '#E9D5FF',
         fontWeight: '900',
         fontSize: 15,
-        textDecorationLine: 'underline',
+        
     },
     constellation: {
         position: 'absolute',
