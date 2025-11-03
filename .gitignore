@@ -39,5 +39,71 @@ yarn-error.*
 # generated native folders
 /ios
 /android
-server/__pycache__/python.cpython-311.pyc
+
+# --- 🧠 Server (Flask / Python) ---
+server/.venv/
+server/venv/
+server/env/
+server/__pycache__/
+server/*.pyc
+server/debug_out/
+server/*.log
+server/*.tmp
+
+# Sensitive keys / config
+server/.env
+server/firebase-key.json
+
+# Build artifacts
+server/build/
+server/dist/
+*.egg-info/
+
+# OS / IDE stuff
+.vscode/
+.idea/
+Thumbs.db
+
+# --- Server (Flask / Python) ---
+server/.venv/
+server/venv/
+server/env/
+server/__pycache__/
+server/*.pyc
+server/debug_out/
+server/*.log
+server/*.tmp
+
+# Secrets
+server/.env
+server/firebase-key.json
+
+# (ซ้ำเพื่อความชัวร์ – ฝั่ง client ก็ไม่ให้ขึ้น)
+node_modules/
+.expo/
+dist/
+web-build/
+ios/
+android/
+
+# --- Server (Flask / Python) ---
+server/.venv/
+server/venv/
+server/env/
+server/__pycache__/
+server/*.pyc
+server/debug_out/
+server/*.log
+server/*.tmp
+server/.env
+server/firebase-key.json
+
+# --- Expo/React Native ---
+node_modules/
+.expo/
+dist/
+web-build/
+ios/
+android/
+
 
