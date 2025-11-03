@@ -14,10 +14,14 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+
+import { useAppDispatch } from '@/redux/hooks';
+import { fetchUserProfile } from '@/redux/slices/userSlice';
 import { signInWithEmail } from '@/services/auth';
 
 export default function SignInScreen() {
     const router = useRouter();
+    const dispatch = useAppDispatch();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -41,10 +45,15 @@ export default function SignInScreen() {
                 setErrorMessage(result.message);
                 return;
             }
+            try {
+                await dispatch(fetchUserProfile()).unwrap();
+            } catch (fetchError) {
+                console.warn('Unable to refresh profile after sign in:', fetchError);
+            }
             router.replace('/(tabs)/Scanscreen');
         } catch (error) {
             setErrorMessage(
-                error instanceof Error ? error.message :  ' An unexpected error occurred. Please try again.'
+                error instanceof Error ? error.message : ' An unexpected error occurred. Please try again.'
             );
         } finally {
             setIsLoading(false);
@@ -59,7 +68,7 @@ export default function SignInScreen() {
             <SafeAreaView style={styles.safeArea}>
                 <KeyboardAvoidingView
                     style={styles.container}
-                    
+
                 >
                     {/* Decorative Stars */}
                     <View style={styles.starsContainer}>
@@ -93,9 +102,9 @@ export default function SignInScreen() {
                                         Email
                                     </Text>
                                     <View style={styles.inputContainer}>
-                                      
+
                                         <TextInput
-                                           
+
                                             autoCapitalize="none"
                                             autoComplete="email"
                                             keyboardType="email-address"
@@ -114,10 +123,10 @@ export default function SignInScreen() {
                                         Password
                                     </Text>
                                     <View style={styles.inputContainer}>
-                                        
+
                                         <TextInput
-                                            
-                                            placeholder= " your password"
+
+                                            placeholder=" your password"
                                             placeholderTextColor="#9CA3AF"
                                             secureTextEntry={!showPassword}
                                             value={password}
@@ -139,7 +148,7 @@ export default function SignInScreen() {
 
                                 {/* Sign In Button */}
                                 <TouchableOpacity
-                                    onPress={handleSignIn}
+                                    onPress= {handleSignIn}
                                     disabled={isLoading}
                                     activeOpacity={0.8}
                                 >
@@ -156,9 +165,7 @@ export default function SignInScreen() {
                                             </View>
                                         ) : (
                                             <View style={styles.buttonContent}>
-                                              
                                                 <Text style={styles.primaryButtonText}> Sign In</Text>
-                                                
                                             </View>
                                         )}
                                     </LinearGradient>
@@ -178,11 +185,11 @@ export default function SignInScreen() {
                     {/* Footer */}
                     <View style={styles.footer}>
                         <Text style={styles.footerText}> Don't have an account? </Text>
-                        
+
                         <TouchableOpacity onPress={() => router.push('./signupscreen')}>
-                            
-                                <Text style={styles.link}> sign up </Text>
-                            
+
+                            <Text style={styles.link}> sign up </Text>
+
                         </TouchableOpacity>
                     </View>
 
@@ -272,7 +279,7 @@ const styles = StyleSheet.create({
     cardGradient: {
         padding: 24,
         backgroundColor: 'rgba(26, 11, 46, 1)',
-        
+
     },
     form: {
         gap: 20,
@@ -377,7 +384,7 @@ const styles = StyleSheet.create({
         color: '#E9D5FF',
         fontWeight: '900',
         fontSize: 15,
-        
+
     },
     constellation: {
         position: 'absolute',
