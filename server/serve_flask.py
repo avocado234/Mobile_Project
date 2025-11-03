@@ -140,30 +140,44 @@ def analyze_endpoint():
 
 @app.post("/scan/save")
 def scan_save():
-    if not request.is_json:
-        return jsonify({"error": "Content-Type must be application/json"}), 400
+    try:
+        if not request.is_json:
+            return jsonify({"error": "Content-Type must be application/json"}), 400
 
-    data = request.get_json(silent=True) or {}
-    user_id = data.get("user_id") or "anonymous"
-    analyze_result = data.get("analyze_result")
-    meta = data.get("meta") or {}
+        data = request.get_json(silent=True) or {}
+        user_id = data.get("user_id") or "anonymous"
+        analyze_result = data.get("analyze_result") or {}
+        meta = data.get("meta") or {}
 
-    if not isinstance(analyze_result, dict):
-        return jsonify({"error": "analyze_result (object) is required"}), 400
+        if not isinstance(analyze_result, dict):
+            return jsonify({"error": "analyze_result (object) is required"}), 400
 
-    doc = {
-        "user_id": user_id,
-        "summary": _summarize_analyze(analyze_result),
-        "meta": meta,
-        "createdAt": firestore.SERVER_TIMESTAMP,
-    }
+        # 🔒 ตัด field ขนาดใหญ่ทิ้ง (ห้ามเก็บลง Firestore)
+        big_keys = [
+            "roi_skeleton_png_b64", "roi_binary_png_b64", "roi_gray_png_b64",
+            "full_image_b64", "image_b64", "mask_b64",
+        ]
+        slim_result = {k: v for k, v in analyze_result.items() if k not in big_keys}
 
-    # ถ้าอยากเก็บภาพโครงร่าง skeleton เป็น base64 ด้วย
-    if "roi_skeleton_png_b64" in analyze_result:
-        doc["skeleton_b64"] = analyze_result["roi_skeleton_png_b64"]
+        doc = {
+            "user_id": user_id,
+            "summary": _summarize_analyze(slim_result),
+            "meta": meta,
+            "createdAt": firestore.SERVER_TIMESTAMP,
+        }
 
-    ref = db.collection("scans").add(doc)  # (write_time, doc_ref)
-    return jsonify({"id": ref[1].id}), 201
+        # ❌ ไม่เก็บรูป base64 เพื่อกันทะลุ 1MB
+        # ถ้าอยากเก็บจริง ๆ ให้เก็บลง Cloud Storage แล้วเก็บแค่ URL แทน
+
+        ref = db.collection("scans").add(doc)  # (write_time, doc_ref)
+        return jsonify({"id": ref[1].id}), 201
+
+    except Exception as e:
+        # log ให้เห็นใน console ว่าพังเพราะอะไร
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": f"save_failed: {e.__class__.__name__}: {str(e)}"}), 500
+
 
 @app.get("/scan/list")
 def scan_list():
@@ -350,7 +364,22 @@ def fortune_predict():
     ref = db.collection("fortunes").add(doc)
     return jsonify({"fortune_id": ref[1].id, "answer": answer}), 201
 
+@app.get("/firestore/ping")
+def firestore_ping():
+    try:
+        doc = {"ping": True, "ts": firestore.SERVER_TIMESTAMP}
+        ref = db.collection("ping_test").add(doc)  # (write_time, doc_ref)
+        return jsonify({"ok": True, "id": ref[1].id}), 200
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+
+
 print("DEEPSEEK_API_KEY:", os.getenv("DEEPSEEK_API_KEY"))
+
 if __name__ == "__main__":
-    # use_reloader=False กันรีสตาร์ทกลางคำขอ
+    print("URL MAP:", app.url_map)  
     app.run(host="0.0.0.0", port=8000, debug=True, use_reloader=False)
+    
