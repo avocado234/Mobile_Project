@@ -8,6 +8,7 @@ type UserProfile = {
   email: string;
   phoneNumber: string;
   birthDate: string;
+  gender: string;
 };
 
 type UserState = {
@@ -42,6 +43,7 @@ export const fetchUserProfile = createAsyncThunk<
         email: user.email ?? '',
         phoneNumber: '',
         birthDate: '',
+        gender: '',
       };
       return profile;
     }
@@ -53,6 +55,7 @@ export const fetchUserProfile = createAsyncThunk<
       email: data.email ?? user.email ?? '',
       phoneNumber: data.phoneNumber ?? '',
       birthDate: data.birthDate ?? '',
+      gender: data.gender ?? '',
     };
   }
 );
@@ -62,6 +65,7 @@ export type SaveUserProfilePayload = {
   email: string;
   phoneNumber: string;
   birthDate: string;
+  gender: string;
 };
 
 export const saveUserProfile = createAsyncThunk<
@@ -90,11 +94,12 @@ export const saveUserProfile = createAsyncThunk<
     email: profile.email,
     phoneNumber: profile.phoneNumber,
     birthDate: profile.birthDate,
+    gender: profile.gender,
   };
 });
 
 const userSlice = createSlice({
-  name: 'user',
+  name: 'users',
   initialState,
   reducers: {
     clearUserState: () => initialState,
