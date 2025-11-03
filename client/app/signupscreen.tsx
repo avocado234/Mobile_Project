@@ -16,11 +16,15 @@ import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/dat
 import DropDownPicker from 'react-native-dropdown-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { signUpWithEmail } from '@/services/auth';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+import { useAppDispatch } from '@/redux/hooks';
+import { fetchUserProfile } from '@/redux/slices/userSlice';
+import { signUpWithEmail } from '@/services/auth';
 
 export default function SignUpScreen() {
   const router = useRouter();
+  const dispatch = useAppDispatch();
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -99,6 +103,12 @@ export default function SignUpScreen() {
       if (!result.ok) {
         setErrorMessage(result.message);
         return;
+      }
+
+      try {
+        await dispatch(fetchUserProfile()).unwrap();
+      } catch (fetchError) {
+        console.warn('Unable to refresh profile after sign up:', fetchError);
       }
 
       router.replace('/(tabs)/Scanscreen');
