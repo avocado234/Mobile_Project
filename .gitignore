@@ -86,3 +86,24 @@ web-build/
 ios/
 android/
 
+# --- Server (Flask / Python) ---
+server/.venv/
+server/venv/
+server/env/
+server/__pycache__/
+server/*.pyc
+server/debug_out/
+server/*.log
+server/*.tmp
+server/.env
+server/firebase-key.json
+
+# --- Expo/React Native ---
+node_modules/
+.expo/
+dist/
+web-build/
+ios/
+android/
+
+
