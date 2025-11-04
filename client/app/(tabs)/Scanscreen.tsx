@@ -1,3 +1,4 @@
+// client/app/(tabs)/Scanscreen.tsx
 import React, { useEffect, useRef, useState } from "react";
 import { View, Text, Button, Image, StyleSheet, Alert, BackHandler, TouchableOpacity } from "react-native";
 import { CameraView, useCameraPermissions, type FlashMode } from "expo-camera";
@@ -5,19 +6,21 @@ import * as MediaLibrary from "expo-media-library";
 import LoadingScreen from "../../components/LoadingScreen.native";
 import { analyzeImage } from "../../components/api/analyze";
 import { API_BASE } from "../../utils/constants";
+import { getIdToken } from "../../services/auth"; // <-- เพิ่ม
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // --- POST: บันทึกผลวิเคราะห์ลง Firestore ผ่าน Flask (/scan/save)
-async function saveResultToDB(
-  analyzeResult: any,
-  meta: Record<string, any> = {},
-  userId: string = "demo-user"
-) {
+async function saveResultToDB(analyzeResult: any, meta: Record<string, any> = {}) {
+  const token = await getIdToken();
+  if (!token) throw new Error("Not authenticated");
   const res = await fetch(`${API_BASE}/scan/save`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ user_id: userId, analyze_result: analyzeResult, meta }),
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`, // <-- ส่ง token
+    },
+    body: JSON.stringify({ analyze_result: analyzeResult, meta }),
   });
   const json = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(json?.error || `save failed (${res.status})`);
@@ -25,17 +28,16 @@ async function saveResultToDB(
 }
 
 // --- POST: ทำนายดวงจาก scan_id (/fortune/predict)
-async function predictFortune(
-  scanId: string,
-  userId: string = "demo-user",
-  language: "th" | "en" = "th",
-  style: "friendly" | "formal" = "friendly",
-  model = "deepseek-chat"
-) {
+async function predictFortune(scanId: string, language: "th" | "en" = "th", style: "friendly" | "formal" = "friendly", model = "deepseek-chat") {
+  const token = await getIdToken();
+  if (!token) throw new Error("Not authenticated");
   const res = await fetch(`${API_BASE}/fortune/predict`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ scan_id: scanId, user_id: userId, language, style, model }),
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`, // <-- ส่ง token
+    },
+    body: JSON.stringify({ scan_id: scanId, language, style, model }),
   });
   const json = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(json?.error || `predict failed (${res.status})`);
@@ -52,7 +54,7 @@ export default function CameraScreen() {
 
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [showLoading, setShowLoading] = useState(false);
-  const loadingMs = 4000; // ให้พอครอบคลุม analyze+save+predict
+  const loadingMs = 4000;
 
   useEffect(() => {
     const sub = BackHandler.addEventListener("hardwareBackPress", () => (showLoading ? true : false));
@@ -88,13 +90,9 @@ export default function CameraScreen() {
 
       try {
         const [analyzeJson] = await Promise.all([analyzeImage(photo.uri), wait(loadingMs)]);
-
         const { id: scanId } = await saveResultToDB(analyzeJson, { device: "expo", facing, flash, torch });
-
-        const { answer } = await predictFortune(scanId, "demo-user", "th", "friendly", "deepseek-chat");
-
+        const { answer } = await predictFortune(scanId, "th", "friendly", "deepseek-chat");
         setPhotoUri(photo.uri);
-
       } catch (e: any) {
         Alert.alert("ทำนายไม่สำเร็จ", e?.message ?? String(e));
       } finally {
@@ -121,7 +119,6 @@ export default function CameraScreen() {
     }
   };
 
-  // โหมดพรีวิวรูป
   if (photoUri) {
     return (
       <View style={{ flex: 1, backgroundColor: "#000" }}>
@@ -134,7 +131,6 @@ export default function CameraScreen() {
     );
   }
 
-  // โหมดกล้อง
   return (
     <View style={{ flex: 1, backgroundColor: "#000" }}>
       <CameraView ref={cameraRef} style={{ flex: 1 }} facing={facing} flash={flash} enableTorch={torch} />
@@ -175,7 +171,6 @@ export default function CameraScreen() {
 
 const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
-
   topBar: {
     position: "absolute",
     top: 20,
@@ -193,7 +188,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   topBtnText: { color: "#fff", fontSize: 14 },
-
   bottomBar: {
     position: "absolute",
     bottom: 28,
@@ -203,7 +197,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
-
   sideBtn: {
     width: 64,
     height: 40,
@@ -213,7 +206,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   sideBtnText: { color: "#fff" },
-
   shutter: {
     width: 78,
     height: 78,
@@ -230,7 +222,6 @@ const styles = StyleSheet.create({
     borderRadius: 29,
     backgroundColor: "#fff",
   },
-
   previewBar: {
     position: "absolute",
     bottom: 24,
@@ -239,7 +230,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-around",
   },
-
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(0,0,0,0.6)",
