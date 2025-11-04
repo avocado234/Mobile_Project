@@ -11,7 +11,7 @@ import { getIdToken } from "../../services/auth"; // <-- เพิ่ม
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // --- POST: บันทึกผลวิเคราะห์ลง Firestore ผ่าน Flask (/scan/save)
-async function saveResultToDB(analyzeResult: any, meta: Record<string, any> = {}) {
+  async function saveResultToDB(analyzeResult: any, meta: Record<string, any> = {}) {
   const token = await getIdToken();
   if (!token) throw new Error("Not authenticated");
   const res = await fetch(`${API_BASE}/scan/save`, {
@@ -43,7 +43,7 @@ async function predictFortune(scanId: string, language: "th" | "en" = "th", styl
   if (!res.ok) throw new Error(json?.error || `predict failed (${res.status})`);
   return json as { fortune_id: string; answer: string };
 }
-
+  
 export default function CameraScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const cameraRef = useRef<any>(null);
