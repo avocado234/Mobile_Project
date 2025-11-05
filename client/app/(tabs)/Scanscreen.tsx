@@ -21,7 +21,7 @@ import { useAppSelector } from '@/redux/hooks';
 
 
 
-import type { ColorValue } from "react-native";
+
 
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
