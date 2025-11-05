@@ -14,6 +14,16 @@ import { getIdToken } from "../../services/auth";
 
 import type { ColorValue } from "react-native";
 
+import { useRouter } from 'expo-router';
+import { useAuth } from '@/contexts/AuthContext';
+import { useAppSelector } from '@/redux/hooks';
+
+
+
+
+import type { ColorValue } from "react-native";
+
+
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function saveResultToDB(
@@ -65,12 +75,16 @@ const cardGradientColors: readonly [ColorValue, ColorValue, ...ColorValue[]] = [
 ];
 
 export default function CameraScreen() {
+  const router = useRouter();
+  const { user } = useAuth();
+  const userProfile = useAppSelector((state) => state.user.profile);
   const [permission, requestPermission] = useCameraPermissions();
   const cameraRef = useRef<any>(null);
 
   const [facing, setFacing] = useState<"back" | "front">("back");
   const [flash, setFlash] = useState<FlashMode>("off");
   const [torch, setTorch] = useState(false);
+  const [showResultModal, setShowResultModal] = useState(false);
 
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [fortuneAnswer, setFortuneAnswer] = useState<string | null>(null);
