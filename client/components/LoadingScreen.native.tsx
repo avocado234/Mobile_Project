@@ -1,109 +1,124 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { View, ActivityIndicator, Text, StyleSheet } from "react-native";
-
+import { StyleSheet, Text, View } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import LottieView from "lottie-react-native";
 type Props = {
-  company?: string;               // ✅ เพิ่มให้รองรับพร็อพ company
-  durationMs?: number;            // เวลาแสดงรวม (เช่น 5–6 วิ)
-  onComplete?: () => void;        // เรียกเมื่อโหลดครบเวลา
-  phrasesOverride?: string[];     // ถ้าอยากส่งรายการข้อความเอง
+  company?: string;
+  durationMs?: number;
+  onComplete?: () => void;
+  phrasesOverride?: string[];
 };
-
-const DEFAULT_PHRASES_TH = [
-  "กำลังดูความรัก...",
-  "กำลังเช็กการเงิน...",
-  "กำลังดูดวงวันนี้...",
-  "กำลังเช็กการงาน...",
-  "กำลังคำนวณโชคลาภ...",
-  "กำลังดูสุขภาพ...",
-  "กำลังเรียงไพ่ยิปซี...",
-  "กำลังตรวจดวงรายเดือน...",
-  "กำลังดูสีมงคลวันนี้...",
-  "กำลังเช็กเลขนำโชค..."
-];
-
 export default function LoadingScreen({
-  company = "Company",
+  company = "Mee Duang",
   durationMs = 5500,
   onComplete,
   phrasesOverride,
 }: Props) {
-  const phrases = useMemo(
-    () => (phrasesOverride?.length ? phrasesOverride : DEFAULT_PHRASES_TH),
-    [phrasesOverride]
+  const defaultPhrases = useMemo(
+    () => [
+      "กำลังสแกนลายนิ้วมือของคุณ",
+      "อ่านค่าจากเส้นชีวิต เส้นสมอง และเส้นหัวใจ",
+      "วิเคราะห์รูปทรงฝ่ามือและค่าโค้ง",
+      "เตรียมคำพยากรณ์สำหรับคุณ",
+    ],
+    []
   );
-
-  // แสดงวลีหมุนไปเรื่อย ๆ ระหว่างรอ
+  const phrases = useMemo(
+    () => (phrasesOverride?.length ? phrasesOverride : defaultPhrases),
+    [phrasesOverride, defaultPhrases]
+  );
   const [phraseIndex, setPhraseIndex] = useState(0);
-
-  // ✅ ใช้ ReturnType เพื่อให้ clearTimeout/clearInterval ถูกชนิดบน RN
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const timeoutRef  = useRef<ReturnType<typeof setTimeout>  | null>(null);
-
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
-    // เปลี่ยนข้อความทุก ~900ms (ปรับได้)
-    intervalRef.current = setInterval(() => {
-      setPhraseIndex((i) => (i + 1) % phrases.length);
-    }, 900);
-
+    if (phrases.length > 1) {
+      intervalRef.current = setInterval(() => {
+        setPhraseIndex((index) => (index + 1) % phrases.length);
+      }, 1200);
+    }
     timeoutRef.current = setTimeout(() => {
       if (intervalRef.current) clearInterval(intervalRef.current);
       onComplete?.();
     }, durationMs);
-
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
-      if (timeoutRef.current)  clearTimeout(timeoutRef.current);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
   }, [durationMs, onComplete, phrases.length]);
-
   return (
     <View style={styles.container}>
       <View style={styles.card}>
-        <ActivityIndicator size="large" color="#FFD369" />
-        <Text style={styles.title}>กำลังโหลดข้อมูลดวงชะตา</Text>
-        <Text style={styles.phrase}>{phrases[phraseIndex]}</Text>
-        {!!company && <Text style={styles.brand}>by {company}</Text>}
+        <Text style={styles.brand}>{company}</Text>
+        <Text style={styles.title}>กำลังประมวลผลลายนิ้วมือของคุณ</Text>
+        <LottieView source={require("../Loading.json")} autoPlay loop style={styles.lottie} />
+        <Text style={styles.phrase}>{phrases[phraseIndex] ?? phrases[0]}</Text>
       </View>
-    </View>
+      </View>
+     
+  
   );
 }
-
 const styles = StyleSheet.create({
-  // พื้นหลังเข้ม + ตัวอักษรสว่าง → อ่านง่าย
   container: {
     flex: 1,
-    backgroundColor: "#0B1020", // น้ำเงินเข้ม
     alignItems: "center",
     justifyContent: "center",
-    padding: 24,
+    paddingHorizontal: 24,
+  },
+  glowOuter: {
+    position: "absolute",
+    width: 260,
+    height: 260,
+    borderRadius: 130,
+    backgroundColor: "rgba(99, 102, 241, 0.25)",
+    opacity: 0.65,
+  },
+  glowInner: {
+    width: "70%",
+    height: "70%",
+    borderRadius: 120,
+    backgroundColor: "rgba(168, 85, 247, 0.45)",
+    alignSelf: "center",
+    marginTop: "15%",
   },
   card: {
-    width: "100%",
-    maxWidth: 360,
-    backgroundColor: "#131A33", // เข้มแต่เบากว่าพื้นหลัง เพื่อแยกชั้น
-    borderRadius: 16,
+    width: "88%",
+    maxWidth: 340,
+    backgroundColor: "rgba(26, 12, 52, 0.92)",
+    borderRadius: 24,
     paddingVertical: 28,
-    paddingHorizontal: 20,
+    paddingHorizontal: 22,
     alignItems: "center",
-    shadowColor: "#000",
-    shadowOpacity: 0.25,
-    shadowRadius: 16,
-    elevation: 6,
-  },
-  title: {
-    marginTop: 14,
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#FFFFFF", // ขาวชัด
-  },
-  phrase: {
-    marginTop: 8,
-    fontSize: 14,
-    color: "#C9CFEC", // อ่อนลงเล็กน้อยให้อ่านสบาย
+    gap: 14,
+    borderWidth: 1,
+    borderColor: "rgba(196, 181, 253, 0.25)",
+    shadowColor: "#8B5CF6",
+    shadowOpacity: 0.32,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 18 },
+    elevation: 12,
   },
   brand: {
-    marginTop: 6,
-    fontSize: 12,
-    color: "#97A1D9",
+    fontSize: 13,
+    fontWeight: "600",
+    letterSpacing: 1,
+    color: "#C4B5FD",
+    textTransform: "uppercase",
+  },
+  title: {
+    textAlign: "center",
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#F4F3FF",
+  },
+  phrase: {
+    fontSize: 13,
+    lineHeight: 20,
+    textAlign: "center",
+    color: "#D5CCFF",
+  },
+  lottie: {
+    width: 200,
+    height: 200,
   },
 });

@@ -58,6 +58,7 @@ export default function CameraScreen() {
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [fortuneAnswer, setFortuneAnswer] = useState<string | null>(null);
   const [showLoading, setShowLoading] = useState(false);
+  const [showLoadingOverlay, setShowLoadingOverlay] = useState(false);
   const loadingMs = 4000;
 
   useEffect(() => {
@@ -69,6 +70,22 @@ export default function CameraScreen() {
   useEffect(() => {
     const sub = BackHandler.addEventListener("hardwareBackPress", () => (showLoading ? true : false));
     return () => sub.remove();
+  }, [showLoading]);
+
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    if (showLoading) {
+      timer = setTimeout(() => setShowLoadingOverlay(true), 1000);
+    } else {
+      setShowLoadingOverlay(false);
+    }
+
+    return () => {
+      if (timer) {
+        clearTimeout(timer);
+      }
+    };
   }, [showLoading]);
 
   const cycleFlash = () => {
@@ -84,6 +101,8 @@ export default function CameraScreen() {
   const retake = () => {
     setPhotoUri(null);
     setFortuneAnswer(null);
+    setShowLoading(false);
+    setShowLoadingOverlay(false);
   };
 
   const takePhoto = async () => {
@@ -277,7 +296,7 @@ export default function CameraScreen() {
         </View>
       </SafeAreaView>
 
-      {showLoading && (
+      {showLoadingOverlay && (
         <View style={styles.loadingOverlay} pointerEvents="auto">
           <LoadingScreen company="Horo App" durationMs={loadingMs} />
         </View>
@@ -483,7 +502,7 @@ const styles = StyleSheet.create({
   },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(5, 2, 18, 0.65)",
+    backgroundColor: "rgba(0, 0, 0, 1)",
     justifyContent: "center",
     alignItems: "center",
   },
