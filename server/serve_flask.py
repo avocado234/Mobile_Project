@@ -439,7 +439,8 @@ def fortune_predict():
     model = data.get("model") or "deepseek-chat"
     language = (data.get("language") or "th").lower()
     style = (data.get("style") or "friendly").lower()
-    period = (data.get("period") or "month").lower()  # "week" or "month"
+    period = (data.get("period") or "today").lower()  
+ 
 
     if period not in ("week", "month"):
         period = "month"
@@ -486,10 +487,15 @@ def fortune_predict():
     for k in ("displayName", "dob", "gender", "locale", "timezone", "birthplace", "interests"):
         if user_profile.get(k) not in (None, "", {}):
             safe_profile[k] = user_profile.get(k)
-
-    period_text_th = "1 สัปดาห์ข้างหน้า" if period == "week" else "1 เดือนข้างหน้า"
-    period_text_en = "the next 1 week" if period == "week" else "the next 1 month"
-
+        if period == "today":
+            period_text_th = "วันนี้"
+            period_text_en = "today"
+        elif period == "week":
+            period_text_th = "ภายใน 7 วันข้างหน้า"
+            period_text_en = "within the next 7 days"
+        else:
+            period_text_th = "ภายในเดือนนี้"
+            period_text_en = "within this month"
     if language == "th":
         user_prompt = (
             "ช่วยทำนายจากลายมือ โดยยึดข้อมูลภาพรวมและโปรไฟล์ดังนี้\n"

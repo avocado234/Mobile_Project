@@ -1,3 +1,4 @@
+// client/app/(tabs)/Scanscreen.tsx
 import React, { useEffect, useRef, useState } from "react";
 import { View, Text, Image, StyleSheet, Alert, BackHandler, TouchableOpacity } from "react-native";
 import { CameraView, useCameraPermissions, type FlashMode } from "expo-camera";
@@ -9,6 +10,9 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import LoadingScreen from "../../components/LoadingScreen.native";
 import { analyzeImage } from "../../components/api/analyze";
 import { API_BASE } from "../../utils/constants";
+import { getIdToken } from "../../services/auth";
+
+import type { ColorValue } from "react-native";
 
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
@@ -24,13 +28,17 @@ const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function saveResultToDB(
   analyzeResult: any,
-  meta: Record<string, any> = {},
-  userId: string = "demo-user"
+  meta: Record<string, any> = {}
 ) {
+  const token = await getIdToken();
+  if (!token) throw new Error("กรุณาเข้าสู่ระบบก่อนสแกน");
   const res = await fetch(`${API_BASE}/scan/save`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ user_id: userId, analyze_result: analyzeResult, meta }),
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ analyze_result: analyzeResult, meta }),
   });
   const json = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(json?.error || `save failed (${res.status})`);
@@ -39,18 +47,24 @@ async function saveResultToDB(
 
 async function predictFortune(
   scanId: string,
-  userId: string = "demo-user",
   language: "th" | "en" = "th",
   style: "friendly" | "formal" = "friendly",
-  model = "deepseek-chat"
+  model = "deepseek-chat",
+  period = "today"
 ) {
+  const token = await getIdToken();
+  if (!token) throw new Error("กรุณาเข้าสู่ระบบก่อนทำนาย");
   const res = await fetch(`${API_BASE}/fortune/predict`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ scan_id: scanId, user_id: userId, language, style, model }),
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ scan_id: scanId, language, style, model }),
   });
   const json = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(json?.error || `predict failed (${res.status})`);
+  // server คืน { fortune_id, answer } ตามเวอร์ชันล่าสุด
   return json as { fortune_id: string; answer: string };
 }
 
@@ -91,17 +105,13 @@ export default function CameraScreen() {
 
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | null = null;
-
     if (showLoading) {
       timer = setTimeout(() => setShowLoadingOverlay(true), 1000);
     } else {
       setShowLoadingOverlay(false);
     }
-
     return () => {
-      if (timer) {
-        clearTimeout(timer);
-      }
+      if (timer) clearTimeout(timer);
     };
   }, [showLoading]);
 
@@ -114,6 +124,7 @@ export default function CameraScreen() {
   };
 
   const toggleTorch = () => setTorch((current) => !current);
+  const switchCamera = () => setFacing((current) => (current === "back" ? "front" : "back"));
   const retake = () => {
     setPhotoUri(null);
     setFortuneAnswer(null);
@@ -148,7 +159,8 @@ export default function CameraScreen() {
           torch,
         });
 
-        const { answer } = await predictFortune(scanId, "demo-user", "th", "friendly", "deepseek-chat");
+        const { answer } = await predictFortune(scanId, "th", "friendly", "deepseek-chat", "today");
+
 
         setPhotoUri(photo.uri);
         setFortuneAnswer(answer);
@@ -234,7 +246,6 @@ export default function CameraScreen() {
         <View style={styles.container}>
           <View style={styles.header}>
             <Text style={styles.title}>Palm Scan</Text>
-
           </View>
 
           <View style={styles.card}>
@@ -277,8 +288,6 @@ export default function CameraScreen() {
                   <Ionicons name={torch ? "flashlight" : "flashlight-outline"} size={18} color="#E9D5FF" />
                   <Text style={styles.controlText}>{torch ? "Torch On" : "Torch Off"}</Text>
                 </TouchableOpacity>
-
-
               </View>
 
               <View style={styles.shutterWrapper}>
@@ -312,17 +321,11 @@ export default function CameraScreen() {
         </View>
       </SafeAreaView>
 
-   
       {showLoadingOverlay && (
         <View style={styles.loadingOverlay} pointerEvents="auto">
           <LoadingScreen company="Horo App" durationMs={loadingMs} />
         </View>
       )}
-      {/* <FortuneResultModal
-        visible={showResultModal && Boolean(fortuneAnswer)}
-        predictionText={fortuneAnswer ?? ""}
-        onClose={() => setShowResultModal(false)}
-      /> */}
     </LinearGradient>
   );
 }
@@ -524,10 +527,8 @@ const styles = StyleSheet.create({
   },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
-    
     backgroundColor: "rgba(0, 0, 0, 1)",
     justifyContent: "center",
     alignItems: "center",
   },
 });
-
