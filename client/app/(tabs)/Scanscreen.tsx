@@ -17,6 +17,9 @@ import type { ColorValue } from "react-native";
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAppSelector } from '@/redux/hooks';
+import { FortuneSummaryCard } from '@/components/FortuneResultCard';
+import { enrichFortuneRecord } from '@/utils/fortune';
+import { fetchFortuneOrFallback } from '@/services/fortunes';
 
 
 
@@ -84,10 +87,10 @@ export default function CameraScreen() {
   const [facing, setFacing] = useState<"back" | "front">("back");
   const [flash, setFlash] = useState<FlashMode>("off");
   const [torch, setTorch] = useState(false);
-  const [showResultModal, setShowResultModal] = useState(false);
 
   const [photoUri, setPhotoUri] = useState<string | null>(null);
-  const [fortuneAnswer, setFortuneAnswer] = useState<string | null>(null);
+  const [fortuneResult, setFortuneResult] =
+    useState<ReturnType<typeof enrichFortuneRecord> | null>(null);
   const [showLoading, setShowLoading] = useState(false);
   const [showLoadingOverlay, setShowLoadingOverlay] = useState(false);
   const loadingMs = 4000;
@@ -127,7 +130,7 @@ export default function CameraScreen() {
   const switchCamera = () => setFacing((current) => (current === "back" ? "front" : "back"));
   const retake = () => {
     setPhotoUri(null);
-    setFortuneAnswer(null);
+    setFortuneResult(null);
     setShowLoading(false);
     setShowLoadingOverlay(false);
   };
@@ -136,7 +139,7 @@ export default function CameraScreen() {
     try {
       setShowLoading(true);
       setPhotoUri(null);
-      setFortuneAnswer(null);
+      setFortuneResult(null);
 
       const photo = await cameraRef.current?.takePictureAsync?.({
         quality: 1,
@@ -159,11 +162,50 @@ export default function CameraScreen() {
           torch,
         });
 
-        const { answer } = await predictFortune(scanId, "th", "friendly", "deepseek-chat", "today");
+        const fortuneConfig = {
+          language: "th" as const,
+          style: "friendly" as const,
+          model: "deepseek-chat",
+          period: "today" as const,
+        };
 
+        const { fortune_id: fortuneId, answer } = await predictFortune(
+          scanId,
+          fortuneConfig.language,
+          fortuneConfig.style,
+          fortuneConfig.model,
+          fortuneConfig.period
+        );
+
+        let fortuneRecord = null;
+        if (fortuneId) {
+          const fallback = {
+            id: fortuneId,
+            answer,
+            language: fortuneConfig.language,
+            style: fortuneConfig.style,
+            period: fortuneConfig.period,
+            period_text: {
+              th: fortuneConfig.period === "today" ? "วันนี้" : fortuneConfig.period,
+              en: fortuneConfig.period,
+            },
+            createdAt: new Date(),
+          };
+
+          try {
+            fortuneRecord = user?.uid
+              ? await fetchFortuneOrFallback(user.uid, fortuneId, fallback)
+              : fallback;
+          } catch (fetchError) {
+            console.warn("Failed to fetch fortune document:", fetchError);
+            fortuneRecord = fallback;
+          }
+        }
 
         setPhotoUri(photo.uri);
-        setFortuneAnswer(answer);
+        if (fortuneRecord) {
+          setFortuneResult(enrichFortuneRecord(fortuneRecord));
+        }
       } catch (error: any) {
         Alert.alert("Analysis failed", error?.message ?? String(error));
       } finally {
@@ -188,6 +230,14 @@ export default function CameraScreen() {
     } catch (error: any) {
       Alert.alert("Save failed", error?.message ?? String(error));
     }
+  };
+
+  const handleViewFortuneDetail = () => {
+    if (!fortuneResult) return;
+    router.push({
+      pathname: "/fortune/[fortuneId]",
+      params: { fortuneId: fortuneResult.id },
+    });
   };
 
   if (!permission) {
@@ -308,10 +358,21 @@ export default function CameraScreen() {
                     <Ionicons name="download-outline" size={18} color="#C4B5FD" />
                     <Text style={styles.secondaryButtonText}>Save to device</Text>
                   </TouchableOpacity>
-                  {fortuneAnswer ? (
-                    <View style={styles.fortuneBox}>
-                      <Ionicons name="sparkles-outline" size={18} color="#C4B5FD" />
-                      <Text style={styles.fortuneText}>{fortuneAnswer}</Text>
+                  {fortuneResult ? (
+                    <View style={styles.fortuneResultContainer}>
+                      <FortuneSummaryCard
+                        fortune={fortuneResult}
+                        parsed={fortuneResult.parsed}
+                        onPress={() => handleViewFortuneDetail()}
+                      />
+                      <TouchableOpacity
+                        style={styles.viewFortuneButton}
+                        onPress={handleViewFortuneDetail}
+                        activeOpacity={0.85}
+                      >
+                        <Ionicons name="book-outline" size={18} color="#E9D5FF" />
+                        <Text style={styles.viewFortuneText}>View full reading</Text>
+                      </TouchableOpacity>
                     </View>
                   ) : null}
                 </>
@@ -508,22 +569,25 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     textAlign: "center",
   },
-  fortuneBox: {
+  fortuneResultContainer: {
     marginTop: 18,
-    padding: 16,
-    borderRadius: 14,
-    backgroundColor: "rgba(26, 11, 46, 0.6)",
-    borderWidth: 1,
-    borderColor: "rgba(196, 181, 253, 0.3)",
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 10,
+    gap: 12,
   },
-  fortuneText: {
-    flex: 1,
+  viewFortuneButton: {
+    borderRadius: 14,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: "rgba(196, 181, 253, 0.35)",
+    backgroundColor: "rgba(196, 181, 253, 0.12)",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  viewFortuneText: {
     color: "#E9D5FF",
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 14,
+    fontWeight: "600",
   },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
