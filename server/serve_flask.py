@@ -166,6 +166,87 @@ def _fetch_user_profile(user_id: str) -> dict:
         return {}
 
 
+def _normalize_birth_date(raw) -> str | None:
+    """
+    Normalize common birth date formats to ISO ``YYYY-MM-DD`` strings.
+    Accepts strings, datetime/date instances, or Firestore timestamps.
+    """
+    if not raw:
+        return None
+    if isinstance(raw, datetime):
+        return raw.date().isoformat()
+    if hasattr(raw, "to_datetime"):
+        try:
+            return raw.to_datetime().date().isoformat()
+        except Exception:
+            pass
+    if isinstance(raw, str):
+        value = raw.strip()
+        if not value:
+            return None
+        for fmt in ("%Y-%m-%d", "%d-%m-%Y", "%d/%m/%Y", "%Y/%m/%d"):
+            try:
+                return datetime.strptime(value, fmt).date().isoformat()
+            except ValueError:
+                continue
+        if len(value) >= 4:
+            return value
+    return None
+
+
+def _calculate_age(iso_date: str | None) -> int | None:
+    if not iso_date:
+        return None
+    try:
+        dob = datetime.fromisoformat(iso_date)
+    except ValueError:
+        return None
+    today = datetime.now(timezone.utc).date()
+    age = today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
+    return age if age >= 0 else None
+
+
+def _build_safe_profile(user_profile: dict) -> dict:
+    """
+    Map the Firestore user document to a compact, prompt-friendly dict.
+    """
+    safe: dict[str, object] = {}
+
+    name = (
+        user_profile.get("displayName")
+        or user_profile.get("name")
+        or user_profile.get("fullName")
+    )
+    if name:
+        safe["name"] = name
+
+    dob = (
+        user_profile.get("dob")
+        or user_profile.get("birthDate")
+        or user_profile.get("birthdate")
+    )
+    dob_iso = _normalize_birth_date(dob)
+    if dob_iso:
+        safe["birthDate"] = dob_iso
+        age = _calculate_age(dob_iso)
+        if age is not None:
+            safe["age"] = age
+
+    for field, alias in (
+        ("gender", "gender"),
+        ("locale", "locale"),
+        ("timezone", "timezone"),
+        ("birthplace", "birthplace"),
+        ("interests", "interests"),
+        ("occupation", "occupation"),
+    ):
+        value = user_profile.get(field)
+        if value not in (None, "", {}):
+            safe[alias] = value
+
+    return safe
+
+
 @app.get("/routes")
 def routes():
     return {"routes": sorted([r.rule for r in app.url_map.iter_rules()])}, 200
@@ -439,16 +520,16 @@ def fortune_predict():
     model = data.get("model") or "deepseek-chat"
     language = (data.get("language") or "th").lower()
     style = (data.get("style") or "friendly").lower()
-    period = (data.get("period") or "today").lower()  
- 
+    period = (data.get("period") or "today").lower()
 
-    if period not in ("week", "month"):
-        period = "month"
+    if period not in ("today", "week", "month"):
+        period = "today"
 
     user_id = _ensure_user_doc(user_id)
 
     # fetch user profile for context
     user_profile = _fetch_user_profile(user_id)
+    safe_profile = _build_safe_profile(user_profile)
     # ตัวอย่างฟิลด์ที่คาดหวัง: displayName, dob (YYYY-MM-DD), gender, locale, timezone, interests ฯลฯ
 
     if not summary and scan_id:
@@ -482,20 +563,18 @@ def fortune_predict():
         d = (summary.get(name) or {})
         return f"{name}: length_px={d.get('length_px')}, branch_style={d.get('branch_style')}"
 
-    # Embed user profile (safe fields only)
-    safe_profile = {}
-    for k in ("displayName", "dob", "gender", "locale", "timezone", "birthplace", "interests"):
-        if user_profile.get(k) not in (None, "", {}):
-            safe_profile[k] = user_profile.get(k)
-        if period == "today":
-            period_text_th = "วันนี้"
-            period_text_en = "today"
-        elif period == "week":
-            period_text_th = "ภายใน 7 วันข้างหน้า"
-            period_text_en = "within the next 7 days"
-        else:
-            period_text_th = "ภายในเดือนนี้"
-            period_text_en = "within this month"
+    # Embed user profile (safe fields only) and set time-frame copy
+
+    if period == "today":
+        period_text_th = "ภายนในวันนี้"
+        period_text_en = "today"
+    elif period == "week":
+        period_text_th = "ภายนใน 7 วันข้างหน้า"
+        period_text_en = "within the next 7 days"
+    else:
+        period_text_th = "ภายนในเดือนนี้"
+        period_text_en = "within this month"
+
     if language == "th":
         user_prompt = (
             "ช่วยทำนายจากลายมือ โดยยึดข้อมูลภาพรวมและโปรไฟล์ดังนี้\n"
@@ -564,6 +643,7 @@ def fortune_predict():
         "language": language,
         "style": style,
         "period": period,
+        "period_text": {"th": period_text_th, "en": period_text_en},
         "user_profile_used": safe_profile,
         "answer": answer,
         "raw": resp,

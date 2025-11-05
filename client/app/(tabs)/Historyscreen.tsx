@@ -1,53 +1,26 @@
 import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, FlatList, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import {
-  Timestamp,
-  collection,
-  limit,
-  onSnapshot,
-  orderBy,
-  query,
-} from "firebase/firestore";
+import { collection, limit, onSnapshot, orderBy, query } from "firebase/firestore";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
-
-
-type FortuneLineSummary = {
-  length_px?: number;
-  branch_style?: string;
-} | null;
-
-type FortuneSummary = {
-  life?: FortuneLineSummary;
-  head?: FortuneLineSummary;
-  heart?: FortuneLineSummary;
-} | null;
-
-type FortuneRecord = {
-  id: string;
-  predictionText: string;
-  createdAt?: Timestamp | null;
-  language?: string;
-  style?: string;
-  summary?: FortuneSummary;
-  features?: Record<string, unknown>;
-};
-
-type FirestoreTimestamp = Timestamp | { seconds: number; nanoseconds: number };
+import { FortuneSummaryCard } from "@/components/FortuneResultCard";
+import { enrichFortuneRecord } from "@/utils/fortune";
+import type { FortuneDocument, FortuneSummary } from "@/types/fortune";
 
 const gradientColors = ["#1a0b2e", "#2d1b4e", "#1a0b2e"] as const;
-const cardGradient = ["rgba(167, 139, 250, 0.18)", "rgba(196, 181, 253, 0.06)"] as const;
 const historyLimit = 50;
+
+type FortuneItem = ReturnType<typeof enrichFortuneRecord>;
 
 export default function HistoryScreen() {
   const { user, initializing } = useAuth();
   const router = useRouter();
-  const [items, setItems] = useState<FortuneRecord[]>([]);
+  const [items, setItems] = useState<FortuneItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -71,25 +44,41 @@ export default function HistoryScreen() {
     const unsubscribe = onSnapshot(
       fortunesQuery,
       (snapshot) => {
-        const data: FortuneRecord[] = snapshot.docs.map((doc) => {
-          const payload = doc.data();
-          return {
-            id: doc.id,
-            predictionText: payload.predictionText
-              ?? payload.result?.intro
-              ?? payload.result?.topic1?.content
-              ?? "",
-            createdAt: payload.createdAt ?? null,
-            language: payload.language ?? payload.result?.language ?? "",
-            style: payload.style ?? "",
-            summary: payload.summary ?? null,
-            features: payload.features ?? undefined,
+        const data: FortuneItem[] = snapshot.docs.map((docSnap) => {
+          const payload = docSnap.data() as Record<string, unknown>;
+          const nestedResult = payload.result as Record<string, unknown> | undefined;
+
+          const fortuneDoc: FortuneDocument = {
+            id: docSnap.id,
+            answer:
+              (payload.answer as string | undefined) ??
+              (payload.predictionText as string | undefined) ??
+              (nestedResult?.intro as string | undefined) ??
+              (nestedResult?.topic1 as any)?.content ??
+              "",
+            createdAt: (payload.createdAt as any) ?? null,
+            language:
+              (payload.language as string | undefined) ??
+              (nestedResult?.language as string | undefined) ??
+              "",
+            style: (payload.style as string | undefined) ?? "",
+            period: (payload.period as string | undefined) ?? "",
+            period_text: (payload.period_text as FortuneDocument["period_text"]) ?? null,
+            summary: (payload.summary as FortuneSummary | undefined) ?? null,
+            model:
+              (payload.model as string | undefined) ??
+              (nestedResult?.model as string | undefined) ??
+              undefined,
+            user_profile_used: payload.user_profile_used as Record<string, unknown> | undefined,
+            features: payload.features as Record<string, unknown> | undefined,
           };
-  
-      });
-    setItems(data);
-    setLoading(false);
-  },
+
+          return enrichFortuneRecord(fortuneDoc);
+        });
+
+        setItems(data);
+        setLoading(false);
+      },
     (err) => {
       console.error("Failed to load fortunes:", err);
       if (err.code === "failed-precondition") {
@@ -152,7 +141,7 @@ return (
           contentContainerStyle={items.length ? styles.listContent : styles.emptyContainer}
           ListEmptyComponent={emptyContent}
           renderItem={({ item }) => (
-            <HistoryCard
+            <HistoryItem
               item={item}
               onPress={() =>
                 router.push({
@@ -169,114 +158,65 @@ return (
 );
 }
 
-type HistoryCardProps = {
-  item: FortuneRecord;
+type HistoryItemProps = {
+  item: FortuneItem;
   onPress: () => void;
 };
 
-function HistoryCard({ item, onPress }: HistoryCardProps) {
-  const createdAt = formatTimestamp(item.createdAt);
+function HistoryItem({ item, onPress }: HistoryItemProps) {
   const lineSummary = buildLineSummary(item.summary);
 
   return (
-    <Pressable onPress={onPress} style={styles.cardWrapper}>
-      <LinearGradient colors={cardGradient} style={styles.card}>
-        <View style={styles.cardHeader}>
-          <View style={styles.cardHeaderLeft}>
-            <Ionicons name="sparkles-outline" size={18} color="#F4F3FF" />
-            <Text style={styles.cardDate}>{createdAt}</Text>
-          </View>
-          <View style={styles.badgeRow}>
-            {item.language ? <Badge text={item.language.toUpperCase()} /> : null}
-            {item.style ? <Badge text={item.style} /> : null}
-          </View>
+    <View style={styles.historyItemWrapper}>
+      <FortuneSummaryCard fortune={item} parsed={item.parsed} onPress={onPress} />
+      {lineSummary.length ? (
+        <View style={styles.summarySection}>
+          {lineSummary.map(({ label, value }) => (
+            <View key={label} style={styles.summaryRow}>
+              <View style={styles.summaryBullet} />
+              <Text style={styles.summaryText}>
+                <Text style={styles.summaryTextLabel}>{label}:</Text> {value}
+              </Text>
+            </View>
+          ))}
         </View>
-
-        <Text style={styles.answerText} numberOfLines={3}>
-          {item.predictionText || "ไม่มีคำตอบ"}
-        </Text>
-      </LinearGradient>
-    </Pressable>
-  );
-}
-
-function Badge({ text }: { text: string }) {
-  return (
-    <View style={styles.badge}>
-      <Text style={styles.badgeText}>{text}</Text>
+      ) : null}
     </View>
   );
 }
 
-type LineDisplay = {
-  label: string;
-  text: string;
-};
+type LineSummaryRow = { label: string; value: string };
 
-function buildLineSummary(
-  summary: FortuneSummary | null | undefined,
- 
-): LineDisplay[] {
-  const hints: LineDisplay[] = [];
+function buildLineSummary(summary: FortuneSummary | null | undefined): LineSummaryRow[] {
+  if (!summary) return [];
 
-  const derivedSummary = summary ?? null;
-
-  if (derivedSummary) {
-    const mapping: Array<{ key: keyof NonNullable<FortuneSummary>; label: string }> = [
-      { key: "life", label: "เส้นชีวิต" },
-      { key: "head", label: "เส้นสมอง" },
-      { key: "heart", label: "เส้นหัวใจ" },
-    ];
-
-    mapping.forEach(({ key, label }) => {
-      const detail = derivedSummary?.[key];
-      if (!detail) return;
-
-      const parts: string[] = [];
-      if (detail.length_px != null) {
-        parts.push(`ความยาว ~${Math.round(detail.length_px)}px`);
-      }
-      if (detail.branch_style) {
-        parts.push(`ลักษณะ ${detail.branch_style}`);
-      }
-
-      if (!parts.length) return;
-      hints.push({ label, text: `${label}: ${parts.join(" · ")}` });
-    });
-  }
-
-  const featureHints: Array<{ key: string; label: string }> = [
-    
+  const mapping: Array<{ key: keyof NonNullable<FortuneSummary>; label: string }> = [
+    { key: "life", label: "Life line" },
+    { key: "head", label: "Head line" },
+    { key: "heart", label: "Heart line" },
   ];
 
- 
+  const rows: LineSummaryRow[] = [];
 
-  return hints;
-}
+  mapping.forEach(({ key, label }) => {
+    const detail = summary?.[key];
+    if (!detail) {
+      return;
+    }
 
-function formatTimestamp(value: FirestoreTimestamp | Date | null | undefined): string {
-  const date = normalizeDate(value);
-  if (!date) return "ไม่ทราบเวลา";
-  const day = `${date.getDate()}`.padStart(2, "0");
-  const month = `${date.getMonth() + 1}`.padStart(2, "0");
-  const year = date.getFullYear();
-  const hour = `${date.getHours()}`.padStart(2, "0");
-  const minute = `${date.getMinutes()}`.padStart(2, "0");
-  return `${day}/${month}/${year} ${hour}:${minute} น.`;
-}
+    const parts: string[] = [];
+    if (detail.length_px != null) {
+      parts.push(`length ~ ${Math.round(detail.length_px)} px`);
+    }
+    if (detail.branch_style) {
+      parts.push(`branch ${detail.branch_style}`);
+    }
+    if (parts.length) {
+      rows.push({ label, value: parts.join(" | ") });
+    }
+  });
 
-function normalizeDate(value: FirestoreTimestamp | Date | null | undefined): Date | null {
-  if (!value) return null;
-  if (value instanceof Date) return value;
-  if (value instanceof Timestamp) return value.toDate();
-  if (typeof (value as Timestamp).toDate === "function") {
-    return (value as Timestamp).toDate();
-  }
-  const ts = value as { seconds?: number; nanoseconds?: number };
-  if (typeof ts.seconds === "number") {
-    return new Date(ts.seconds * 1000 + (ts.nanoseconds ?? 0) / 1_000_000);
-  }
-  return null;
+  return rows;
 }
 
 function EmptyState({
@@ -316,11 +256,6 @@ const styles = StyleSheet.create({
     color: "#F4F3FF",
     letterSpacing: 0.3,
   },
-  headerSubtitle: {
-    marginTop: 6,
-    fontSize: 14,
-    color: "#C4B5FD",
-  },
   errorBanner: {
     flexDirection: "row",
     alignItems: "center",
@@ -357,57 +292,17 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingBottom: 48,
   },
-  cardWrapper: {
-    borderRadius: 22,
-    backgroundColor: "rgba(26, 11, 46, 0.65)",
-    borderWidth: 1,
-    borderColor: "rgba(167, 139, 250, 0.25)",
-    overflow: "hidden",
-  },
-  card: {
-    padding: 18,
+  historyItemWrapper: {
     gap: 12,
-  },
-  cardHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  cardHeaderLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  cardDate: {
-    color: "#E9D5FF",
-    fontSize: 13,
-    fontWeight: "600",
-  },
-  badgeRow: {
-    flexDirection: "row",
-    gap: 6,
-  },
-  badge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    backgroundColor: "rgba(139, 92, 246, 0.25)",
-  },
-  badgeText: {
-    color: "#E9D5FF",
-    fontSize: 11,
-    fontWeight: "600",
-  },
-  answerText: {
-    color: "#F9FAFB",
-    fontSize: 14,
-    lineHeight: 20,
   },
   summarySection: {
     gap: 6,
-    paddingTop: 8,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: "rgba(168, 85, 247, 0.25)",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "rgba(168, 85, 247, 0.2)",
+    backgroundColor: "rgba(26, 11, 46, 0.55)",
   },
   summaryRow: {
     flexDirection: "row",
@@ -426,6 +321,9 @@ const styles = StyleSheet.create({
     color: "#E0E7FF",
     fontSize: 12,
     lineHeight: 18,
+  },
+  summaryTextLabel: {
+    fontWeight: "600",
   },
   emptyState: {
     alignItems: "center",
