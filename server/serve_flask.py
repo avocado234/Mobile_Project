@@ -566,13 +566,13 @@ def fortune_predict():
     # Embed user profile (safe fields only) and set time-frame copy
 
     if period == "today":
-        period_text_th = "ภายนในวันนี้"
+        period_text_th = "ภายในวันนี้"
         period_text_en = "today"
     elif period == "week":
-        period_text_th = "ภายนใน 7 วันข้างหน้า"
+        period_text_th = "ภายใน 7 วันข้างหน้า"
         period_text_en = "within the next 7 days"
     else:
-        period_text_th = "ภายนในเดือนนี้"
+        period_text_th = "ภายในเดือนนี้"
         period_text_en = "within this month"
 
     if language == "th":

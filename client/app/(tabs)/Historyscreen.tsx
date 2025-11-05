@@ -164,59 +164,11 @@ type HistoryItemProps = {
 };
 
 function HistoryItem({ item, onPress }: HistoryItemProps) {
-  const lineSummary = buildLineSummary(item.summary);
-
   return (
     <View style={styles.historyItemWrapper}>
       <FortuneSummaryCard fortune={item} parsed={item.parsed} onPress={onPress} />
-      {lineSummary.length ? (
-        <View style={styles.summarySection}>
-          {lineSummary.map(({ label, value }) => (
-            <View key={label} style={styles.summaryRow}>
-              <View style={styles.summaryBullet} />
-              <Text style={styles.summaryText}>
-                <Text style={styles.summaryTextLabel}>{label}:</Text> {value}
-              </Text>
-            </View>
-          ))}
-        </View>
-      ) : null}
     </View>
   );
-}
-
-type LineSummaryRow = { label: string; value: string };
-
-function buildLineSummary(summary: FortuneSummary | null | undefined): LineSummaryRow[] {
-  if (!summary) return [];
-
-  const mapping: Array<{ key: keyof NonNullable<FortuneSummary>; label: string }> = [
-    { key: "life", label: "Life line" },
-    { key: "head", label: "Head line" },
-    { key: "heart", label: "Heart line" },
-  ];
-
-  const rows: LineSummaryRow[] = [];
-
-  mapping.forEach(({ key, label }) => {
-    const detail = summary?.[key];
-    if (!detail) {
-      return;
-    }
-
-    const parts: string[] = [];
-    if (detail.length_px != null) {
-      parts.push(`length ~ ${Math.round(detail.length_px)} px`);
-    }
-    if (detail.branch_style) {
-      parts.push(`branch ${detail.branch_style}`);
-    }
-    if (parts.length) {
-      rows.push({ label, value: parts.join(" | ") });
-    }
-  });
-
-  return rows;
 }
 
 function EmptyState({
@@ -285,7 +237,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingBottom: 28,
-    gap: 16,
+    gap: 12,
   },
   emptyContainer: {
     flexGrow: 1,
@@ -294,36 +246,6 @@ const styles = StyleSheet.create({
   },
   historyItemWrapper: {
     gap: 12,
-  },
-  summarySection: {
-    gap: 6,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: "rgba(168, 85, 247, 0.2)",
-    backgroundColor: "rgba(26, 11, 46, 0.55)",
-  },
-  summaryRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 8,
-  },
-  summaryBullet: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    marginTop: 6,
-    backgroundColor: "#C4B5FD",
-  },
-  summaryText: {
-    flex: 1,
-    color: "#E0E7FF",
-    fontSize: 12,
-    lineHeight: 18,
-  },
-  summaryTextLabel: {
-    fontWeight: "600",
   },
   emptyState: {
     alignItems: "center",

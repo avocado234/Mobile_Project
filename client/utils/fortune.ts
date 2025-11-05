@@ -137,7 +137,7 @@ export function parseFortuneAnswer(answer: string): ParsedFortune {
 
 export function createFortunePreview(parsed: ParsedFortune, maxChars = 160): string {
   const joined = [
-    ...parsed.sections.map((section) => `${section.title}: ${section.content}`),
+    ...parsed.sections.map((section) => ` ${section.content}`),
     parsed.tips.length ? `Tips: ${parsed.tips.join(', ')}` : '',
   ]
     .filter(Boolean)

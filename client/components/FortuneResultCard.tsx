@@ -87,14 +87,14 @@ export function FortuneResultCard({
         </View>
       ) : null}
 
-      {showSummary && fortune.summary ? (
+      {/* {showSummary && fortune.summary ? (
         <View style={styles.summaryBlock}>
           <Text style={styles.summaryTitle}>Line Summary</Text>
           {renderLineSummary('Life line', fortune.summary.life)}
           {renderLineSummary('Head line', fortune.summary.head)}
           {renderLineSummary('Heart line', fortune.summary.heart)}
         </View>
-      ) : null}
+      ) : null} */}
     </LinearGradient>
   );
 }
@@ -176,24 +176,24 @@ function BulletRow({ text, tone = 'default' }: { text: string; tone?: 'default' 
   );
 }
 
-function renderLineSummary(label: string, summary?: FortuneLineSummary) {
-  if (!summary) return null;
-  const { length_px: length, branch_style: branch } = summary || {};
-  if (length == null && !branch) return null;
-  return (
-    <View style={styles.summaryRow}>
-      <Text style={styles.summaryLabel}>{label}</Text>
-      <Text style={styles.summaryValue}>
-        {[
-          length != null ? `length: ${Math.round(length)}` : null,
-          branch ? `branch: ${branch}` : null,
-        ]
-          .filter(Boolean)
-          .join(' • ')}
-      </Text>
-    </View>
-  );
-}
+// function renderLineSummary(label: string, summary?: FortuneLineSummary) {
+//   if (!summary) return null;
+//   const { length_px: length, branch_style: branch } = summary || {};
+//   if (length == null && !branch) return null;
+//   return (
+//     <View style={styles.summaryRow}>
+//       <Text style={styles.summaryLabel}>{label}</Text>
+//       <Text style={styles.summaryValue}>
+//         {[
+//           length != null ? `length: ${Math.round(length)}` : null,
+//           branch ? `branch: ${branch}` : null,
+//         ]
+//           .filter(Boolean)
+//           .join(' • ')}
+//       </Text>
+//     </View>
+//   );
+// }
 
 const styles = StyleSheet.create({
   resultCard: {
