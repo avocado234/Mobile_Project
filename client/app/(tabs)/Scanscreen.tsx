@@ -44,8 +44,13 @@ async function predictFortune(
   return json as { fortune_id: string; answer: string };
 }
 
-const gradientColors = ["#1a0b2e", "#2d1b4e", "#1a0b2e"];
-const cardGradientColors = ["rgba(167, 139, 250, 0.18)", "rgba(196, 181, 253, 0.06)"];
+import type { ColorValue } from "react-native";
+
+const gradientColors: readonly [ColorValue, ColorValue, ...ColorValue[]] = ["#1a0b2e", "#2d1b4e", "#1a0b2e"];
+const cardGradientColors: readonly [ColorValue, ColorValue, ...ColorValue[]] = [
+  "rgba(167, 139, 250, 0.18)",
+  "rgba(196, 181, 253, 0.06)"
+];
 
 export default function CameraScreen() {
   const [permission, requestPermission] = useCameraPermissions();
@@ -97,7 +102,6 @@ export default function CameraScreen() {
   };
 
   const toggleTorch = () => setTorch((current) => !current);
-  const switchCamera = () => setFacing((current) => (current === "back" ? "front" : "back"));
   const retake = () => {
     setPhotoUri(null);
     setFortuneAnswer(null);
@@ -503,7 +507,7 @@ const styles = StyleSheet.create({
   },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(5, 2, 18, 0.65)",
+    
     backgroundColor: "rgba(0, 0, 0, 1)",
     justifyContent: "center",
     alignItems: "center",
