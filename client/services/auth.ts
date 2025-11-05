@@ -4,6 +4,8 @@ import {
   signInWithEmailAndPassword,
   signOut as firebaseSignOut,
   updateProfile,
+  onAuthStateChanged,
+  type User,
 } from 'firebase/auth';
 import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
 
@@ -87,3 +89,16 @@ export async function signUpWithEmail(
 export async function signOut(): Promise<void> {
   await firebaseSignOut(auth);
 }
+export const waitForUser = (): Promise<User | null> =>
+  new Promise((resolve) => {
+    const unsub = onAuthStateChanged(auth, (u) => {
+      unsub();
+      resolve(u);
+    });
+  });
+
+export const getIdToken = async (): Promise<string | null> => {
+  const u = auth.currentUser ?? (await waitForUser());
+  if (!u) return null;
+  return u.getIdToken(/* forceRefresh */ true);
+};
