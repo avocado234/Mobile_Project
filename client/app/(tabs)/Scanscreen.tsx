@@ -1,6 +1,6 @@
 // client/app/(tabs)/Scanscreen.tsx
 import React, { useEffect, useRef, useState } from "react";
-import { View, Text, Image, StyleSheet, Alert, BackHandler, TouchableOpacity } from "react-native";
+import { View, Text, Image, StyleSheet, Alert, BackHandler, TouchableOpacity, Modal, ScrollView, Pressable } from "react-native";
 import { CameraView, useCameraPermissions, type FlashMode } from "expo-camera";
 import * as MediaLibrary from "expo-media-library";
 import { LinearGradient } from "expo-linear-gradient";
@@ -17,7 +17,7 @@ import type { ColorValue } from "react-native";
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAppSelector } from '@/redux/hooks';
-import { FortuneSummaryCard } from '@/components/FortuneResultCard';
+import { FortuneResultCard } from '@/components/FortuneResultCard';
 import { enrichFortuneRecord } from '@/utils/fortune';
 import { fetchFortuneOrFallback } from '@/services/fortunes';
 
@@ -93,6 +93,7 @@ export default function CameraScreen() {
     useState<ReturnType<typeof enrichFortuneRecord> | null>(null);
   const [showLoading, setShowLoading] = useState(false);
   const [showLoadingOverlay, setShowLoadingOverlay] = useState(false);
+  const [showFortuneModal, setShowFortuneModal] = useState(false);
   const loadingMs = 4000;
 
   useEffect(() => {
@@ -109,7 +110,7 @@ export default function CameraScreen() {
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | null = null;
     if (showLoading) {
-      timer = setTimeout(() => setShowLoadingOverlay(true), 1000);
+      timer = setTimeout(() => setShowLoadingOverlay(true), 2000);
     } else {
       setShowLoadingOverlay(false);
     }
@@ -131,12 +132,15 @@ export default function CameraScreen() {
   const retake = () => {
     setPhotoUri(null);
     setFortuneResult(null);
-    setShowLoading(false);
+    setShowFortuneModal(false);
+      setShowLoading(false);
     setShowLoadingOverlay(false);
+    setShowFortuneModal(false);
   };
 
   const takePhoto = async () => {
     try {
+      setShowFortuneModal(false);
       setShowLoading(true);
       setPhotoUri(null);
       setFortuneResult(null);
@@ -205,6 +209,7 @@ export default function CameraScreen() {
         setPhotoUri(photo.uri);
         if (fortuneRecord) {
           setFortuneResult(enrichFortuneRecord(fortuneRecord));
+          setShowFortuneModal(true);
         }
       } catch (error: any) {
         Alert.alert("Analysis failed", error?.message ?? String(error));
@@ -352,31 +357,7 @@ export default function CameraScreen() {
                 <Text style={styles.shutterLabel}>{photoUri ? "Scan Again" : "Tap to Scan"}</Text>
               </View>
 
-              {photoUri ? (
-                <>
-                  <TouchableOpacity style={styles.secondaryButton} onPress={saveToLibrary} activeOpacity={0.85}>
-                    <Ionicons name="download-outline" size={18} color="#C4B5FD" />
-                    <Text style={styles.secondaryButtonText}>Save to device</Text>
-                  </TouchableOpacity>
-                  {fortuneResult ? (
-                    <View style={styles.fortuneResultContainer}>
-                      <FortuneSummaryCard
-                        fortune={fortuneResult}
-                        parsed={fortuneResult.parsed}
-                        onPress={() => handleViewFortuneDetail()}
-                      />
-                      <TouchableOpacity
-                        style={styles.viewFortuneButton}
-                        onPress={handleViewFortuneDetail}
-                        activeOpacity={0.85}
-                      >
-                        <Ionicons name="book-outline" size={18} color="#E9D5FF" />
-                        <Text style={styles.viewFortuneText}>View full reading</Text>
-                      </TouchableOpacity>
-                    </View>
-                  ) : null}
-                </>
-              ) : null}
+              
             </LinearGradient>
           </View>
         </View>
@@ -387,6 +368,35 @@ export default function CameraScreen() {
           <LoadingScreen company="Horo App" durationMs={loadingMs} />
         </View>
       )}
+
+      {fortuneResult ? (
+        <Modal
+          transparent
+          visible={showFortuneModal}
+          animationType="fade"
+          onRequestClose={() => setShowFortuneModal(false)}
+        >
+          <View style={styles.modalBackdrop}>
+            <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowFortuneModal(false)} />
+            <View style={styles.modalCard}>
+              <TouchableOpacity
+                style={styles.modalCloseButton}
+                onPress={() => setShowFortuneModal(false)}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="close" size={20} color="#E9D5FF" />
+              </TouchableOpacity>
+              <ScrollView
+                style={styles.modalScroll}
+                contentContainerStyle={styles.modalScrollContent}
+                showsVerticalScrollIndicator={false}
+              >
+                <FortuneResultCard fortune={fortuneResult} parsed={fortuneResult.parsed} />
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+     ) : null}
     </LinearGradient>
   );
 }
@@ -573,6 +583,22 @@ const styles = StyleSheet.create({
     marginTop: 18,
     gap: 12,
   },
+  showFortuneButton: {
+    borderRadius: 14,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: "rgba(196, 181, 253, 0.45)",
+    backgroundColor: "rgba(139, 92, 246, 0.25)",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  showFortuneText: {
+    color: "#F4F3FF",
+    fontSize: 14,
+    fontWeight: "600",
+  },
   viewFortuneButton: {
     borderRadius: 14,
     paddingVertical: 12,
@@ -589,6 +615,46 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
   },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 24,
+  },
+  modalCard: {
+    width: "100%",
+    maxWidth: 430,
+    borderRadius: 26,
+    padding: 18,
+    backgroundColor: "rgba(18, 8, 32, 0.95)",
+    borderWidth: 1,
+    borderColor: "rgba(196, 181, 253, 0.35)",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.45,
+    shadowRadius: 28,
+    elevation: 18,
+  },
+  modalCloseButton: {
+    alignSelf: "flex-end",
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    borderWidth: 1,
+    borderColor: "rgba(196, 181, 253, 0.35)",
+    backgroundColor: "rgba(26, 11, 46, 0.75)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 12,
+  },
+  modalScroll: {
+    maxHeight: 420,
+  },
+  modalScrollContent: {
+    paddingBottom: 18,
+    gap: 16,
+  },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(0, 0, 0, 1)",
@@ -596,3 +662,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
 });
+
+
+
+
+
+
+
+
+
