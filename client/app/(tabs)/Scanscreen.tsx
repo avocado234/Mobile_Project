@@ -1,3 +1,4 @@
+// client/app/(tabs)/Scanscreen.tsx
 import React, { useEffect, useRef, useState } from "react";
 import { View, Text, Image, StyleSheet, Alert, BackHandler, TouchableOpacity } from "react-native";
 import { CameraView, useCameraPermissions, type FlashMode } from "expo-camera";
@@ -9,35 +10,38 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import LoadingScreen from "../../components/LoadingScreen.native";
 import { analyzeImage } from "../../components/api/analyze";
 import { API_BASE } from "../../utils/constants";
+import { getIdToken } from "../../services/auth"; // <-- เพิ่ม
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function saveResultToDB(
-  analyzeResult: any,
-  meta: Record<string, any> = {},
-  userId: string = "demo-user"
-) {
+// --- POST: บันทึกผลวิเคราะห์ลง Firestore ผ่าน Flask (/scan/save)
+  async function saveResultToDB(analyzeResult: any, meta: Record<string, any> = {}) {
+  const token = await getIdToken();
+  if (!token) throw new Error("Not authenticated");
   const res = await fetch(`${API_BASE}/scan/save`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ user_id: userId, analyze_result: analyzeResult, meta }),
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`, // <-- ส่ง token
+    },
+    body: JSON.stringify({ analyze_result: analyzeResult, meta }),
   });
   const json = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(json?.error || `save failed (${res.status})`);
   return json as { id: string };
 }
 
-async function predictFortune(
-  scanId: string,
-  userId: string = "demo-user",
-  language: "th" | "en" = "th",
-  style: "friendly" | "formal" = "friendly",
-  model = "deepseek-chat"
-) {
+// --- POST: ทำนายดวงจาก scan_id (/fortune/predict)
+async function predictFortune(scanId: string, language: "th" | "en" = "th", style: "friendly" | "formal" = "friendly", model = "deepseek-chat") {
+  const token = await getIdToken();
+  if (!token) throw new Error("Not authenticated");
   const res = await fetch(`${API_BASE}/fortune/predict`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ scan_id: scanId, user_id: userId, language, style, model }),
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`, // <-- ส่ง token
+    },
+    body: JSON.stringify({ scan_id: scanId, language, style, model }),
   });
   const json = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(json?.error || `predict failed (${res.status})`);
@@ -332,55 +336,21 @@ const styles = StyleSheet.create({
     color: "#C4B5FD",
     textAlign: "center",
   },
-
-  card: {
-    width: "100%",
-    maxWidth: 420,
-    borderRadius: 24,
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: "rgba(167, 139, 250, 0.25)",
-    backgroundColor: "rgba(26, 11, 46, 0.65)",
-  },
-  cardGradient: {
-    padding: 20,
-  },
-  cameraWrapper: {
-    width: "100%",
-    aspectRatio: 3 / 4,
-    borderRadius: 20,
-    overflow: "hidden",
-    backgroundColor: "#050212",
-  },
-  camera: {
-    flex: 1,
-  },
-  previewImage: {
-    width: "100%",
-    height: "100%",
-    resizeMode: "cover",
-  },
-  hintText: {
-    marginTop: 16,
-    fontSize: 13,
-    color: "#E9D5FF",
-    textAlign: "center",
-  },
-  controlsRow: {
-    marginTop: 18,
+  topBtnText: { color: "#fff", fontSize: 14 },
+  bottomBar: {
+    position: "absolute",
+    bottom: 28,
+    left: 20,
+    right: 20,
     flexDirection: "row",
     justifyContent: "space-between",
     gap: 12,
   },
-  controlButton: {
-    flex: 1,
-    borderRadius: 14,
-    paddingVertical: 10,
-    backgroundColor: "rgba(26, 11, 46, 0.5)",
-    borderWidth: 1,
-    borderColor: "rgba(167, 139, 250, 0.2)",
-    flexDirection: "row",
-    alignItems: "center",
+  sideBtn: {
+    width: 64,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: "rgba(0,0,0,0.35)",
     justifyContent: "center",
     gap: 8,
   },
@@ -395,6 +365,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 10,
   },
+  sideBtnText: { color: "#fff" },
   shutter: {
     width: 66,
     height: 66,
@@ -411,45 +382,9 @@ const styles = StyleSheet.create({
     borderRadius: 34,
     backgroundColor: "#fff",
   },
-  shutterLabel: {
-    fontSize: 14,
-    color: "#E9D5FF",
-    fontWeight: "600",
-  },
-  primaryButton: {
-    marginTop: 20,
-    borderRadius: 16,
-    paddingVertical: 14,
-    backgroundColor: "rgba(139, 92, 246, 0.92)",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
-  },
-  primaryButtonText: {
-    fontSize: 15,
-    color: "#fff",
-    fontWeight: "700",
-    letterSpacing: 0.3,
-  },
-  secondaryButton: {
-    marginTop: 16,
-    borderRadius: 14,
-    paddingVertical: 12,
-    borderWidth: 1,
-    borderColor: "rgba(196, 181, 253, 0.35)",
-    backgroundColor: "rgba(196, 181, 253, 0.12)",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-  },
-  secondaryButtonText: {
-    color: "#C4B5FD",
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  permissionCard: {
+  previewBar: {
+    position: "absolute",
+    bottom: 24,
     width: "100%",
     maxWidth: 420,
     borderRadius: 24,
