@@ -10,6 +10,16 @@ import LoadingScreen from "../../components/LoadingScreen.native";
 import { analyzeImage } from "../../components/api/analyze";
 import { API_BASE } from "../../utils/constants";
 
+import { useRouter } from 'expo-router';
+import { useAuth } from '@/contexts/AuthContext';
+import { useAppSelector } from '@/redux/hooks';
+
+
+
+
+import type { ColorValue } from "react-native";
+
+
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function saveResultToDB(
@@ -44,8 +54,6 @@ async function predictFortune(
   return json as { fortune_id: string; answer: string };
 }
 
-import type { ColorValue } from "react-native";
-
 const gradientColors: readonly [ColorValue, ColorValue, ...ColorValue[]] = ["#1a0b2e", "#2d1b4e", "#1a0b2e"];
 const cardGradientColors: readonly [ColorValue, ColorValue, ...ColorValue[]] = [
   "rgba(167, 139, 250, 0.18)",
@@ -53,12 +61,16 @@ const cardGradientColors: readonly [ColorValue, ColorValue, ...ColorValue[]] = [
 ];
 
 export default function CameraScreen() {
+  const router = useRouter();
+  const { user } = useAuth();
+  const userProfile = useAppSelector((state) => state.user.profile);
   const [permission, requestPermission] = useCameraPermissions();
   const cameraRef = useRef<any>(null);
 
   const [facing, setFacing] = useState<"back" | "front">("back");
   const [flash, setFlash] = useState<FlashMode>("off");
   const [torch, setTorch] = useState(false);
+  const [showResultModal, setShowResultModal] = useState(false);
 
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [fortuneAnswer, setFortuneAnswer] = useState<string | null>(null);
@@ -301,11 +313,16 @@ export default function CameraScreen() {
       </SafeAreaView>
 
    
-        { showLoadingOverlay && (
-          <View style={styles.loadingOverlay} pointerEvents="auto">
-            <LoadingScreen company="Horo App" durationMs={loadingMs} />
-          </View>
-        )}
+      {showLoadingOverlay && (
+        <View style={styles.loadingOverlay} pointerEvents="auto">
+          <LoadingScreen company="Horo App" durationMs={loadingMs} />
+        </View>
+      )}
+      {/* <FortuneResultModal
+        visible={showResultModal && Boolean(fortuneAnswer)}
+        predictionText={fortuneAnswer ?? ""}
+        onClose={() => setShowResultModal(false)}
+      /> */}
     </LinearGradient>
   );
 }
@@ -513,3 +530,4 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
 });
+
