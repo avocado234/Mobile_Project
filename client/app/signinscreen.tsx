@@ -148,7 +148,7 @@ export default function SignInScreen() {
 
                                 {/* Sign In Button */}
                                 <TouchableOpacity
-                                    onPress= {() => router.replace('/(tabs)/Scanscreen')}
+                                    onPress= {handleSignIn}
                                     disabled={isLoading}
                                     activeOpacity={0.8}
                                 >
