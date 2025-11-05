@@ -1,12 +1,15 @@
 # server/serve_flask.py
 import os
 import base64
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
 import cv2
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 
@@ -26,11 +29,37 @@ from firebase_admin import credentials, firestore, auth as fb_auth
 app = Flask(__name__)
 CORS(app)
 
-DEEPSEEK_BASE = "https://api.deepseek.com"
+DEEPSEEK_BASE = os.getenv("DEEPSEEK_BASE", "https://api.deepseek.com")
 DEEPSEEK_KEY = os.getenv("DEEPSEEK_API_KEY", "")
 
 # upload size
-app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024  # 16 MB
+app.config["MAX_CONTENT_LENGTH"] = int(os.getenv("MAX_CONTENT_LENGTH_MB", "16")) * 1024 * 1024  # default 16 MB
+
+
+# ---------- HTTP session with retries for DeepSeek ----------
+def _get_timeout():
+    # ENV ปรับได้ เช่น DEEPSEEK_CONNECT_TIMEOUT=10, DEEPSEEK_READ_TIMEOUT=75
+    c = float(os.getenv("DEEPSEEK_CONNECT_TIMEOUT", "10"))
+    r = float(os.getenv("DEEPSEEK_READ_TIMEOUT", "75"))
+    return (c, r)
+
+def _make_session():
+    s = requests.Session()
+    retry = Retry(
+        total=4,                # รวมครั้งแรก = 5 ครั้ง
+        connect=3,              # retry เมื่อ connect ล้มเหลว
+        read=3,                 # retry เมื่อ read timeout
+        backoff_factor=0.8,     # 0.8, 1.6, 3.2, ...
+        status_forcelist=(502, 503, 504),
+        allowed_methods=frozenset(["GET", "POST", "HEAD"])
+    )
+    adapter = HTTPAdapter(max_retries=retry)
+    s.mount("https://", adapter)
+    s.mount("http://", adapter)
+    return s
+
+_HTTP = _make_session()
+# -----------------------------------------------------------
 
 
 def _init_firestore():
@@ -124,6 +153,19 @@ def _get_uid(req) -> str:
     return "anonymous"
 
 
+def _fetch_user_profile(user_id: str) -> dict:
+    """
+    ดึงข้อมูล users/{user_id} (เช่น displayName, dob, gender, locale ฯลฯ)
+    ถ้าเอกสารไม่มี ให้คืน {} (ไม่ error)
+    """
+    try:
+        d = db.collection("users").document(user_id).get()
+        return d.to_dict() or {}
+    except Exception as e:
+        print("[user_profile] fetch failed:", e)
+        return {}
+
+
 @app.get("/routes")
 def routes():
     return {"routes": sorted([r.rule for r in app.url_map.iter_rules()])}, 200
@@ -141,6 +183,26 @@ def env_info():
         "deepseek_base": DEEPSEEK_BASE,
         "has_google_app_creds": bool(os.getenv("GOOGLE_APPLICATION_CREDENTIALS")),
     }), 200
+
+
+@app.get("/debug/deepseek")
+def debug_deepseek():
+    """เช็คว่าออกเน็ตไปยัง DeepSeek ได้ไหม"""
+    t0 = time.time()
+    try:
+        # 401/403 ถือว่า “ถึงปลายทาง” (แค่สิทธิ์/route) => reachable True
+        resp = _HTTP.get(
+            f"{DEEPSEEK_BASE}/v1/models",
+            headers={"Authorization": f"Bearer {DEEPSEEK_KEY}"},
+            timeout=_get_timeout(),
+        )
+        ms = int((time.time() - t0) * 1000)
+        ok = resp.status_code in (200, 401, 403)
+        return jsonify({"reachable": ok, "status": resp.status_code, "latency_ms": ms}), 200
+    except requests.exceptions.ReadTimeout:
+        return jsonify({"reachable": False, "error": "read_timeout"}), 504
+    except requests.RequestException as e:
+        return jsonify({"reachable": False, "error": str(e)}), 502
 
 
 @app.get("/firestore/ping")
@@ -303,7 +365,7 @@ def ai_chat():
     user_id = _ensure_user_doc(user_id)
 
     try:
-        r = requests.post(
+        r = _HTTP.post(
             f"{DEEPSEEK_BASE}/chat/completions",
             headers={
                 "Authorization": f"Bearer {DEEPSEEK_KEY}",
@@ -314,10 +376,12 @@ def ai_chat():
                 "messages": messages,
                 "stream": stream
             },
-            timeout=60,
+            timeout=_get_timeout(),
         )
+    except requests.exceptions.ReadTimeout:
+        return jsonify({"error": "deepseek_timeout", "detail": "DeepSeek read timed out"}), 504
     except requests.RequestException as e:
-        return jsonify({"error": f"request_failed: {str(e)}"}), 502
+        return jsonify({"error": "request_failed", "detail": str(e)}), 502
 
     if not r.ok:
         try:
@@ -355,6 +419,14 @@ def ai_chat():
 
 @app.post("/fortune/predict")
 def fortune_predict():
+    """
+    ใช้สรุปเส้นลายมือ + โปรไฟล์ผู้ใช้ (ถ้ามี) เพื่อทำนาย 4 หัวข้อ:
+    - ความรัก (Love)
+    - การงาน (Career)
+    - การเงิน (Finance)
+    - สุขภาพ (Health)
+    ครอบคลุมช่วงเวลา period: week|month (default=month)
+    """
     if not DEEPSEEK_KEY:
         return jsonify({"error": "DEEPSEEK_API_KEY is missing"}), 500
     if not request.is_json:
@@ -367,8 +439,16 @@ def fortune_predict():
     model = data.get("model") or "deepseek-chat"
     language = (data.get("language") or "th").lower()
     style = (data.get("style") or "friendly").lower()
+    period = (data.get("period") or "month").lower()  # "week" or "month"
+
+    if period not in ("week", "month"):
+        period = "month"
 
     user_id = _ensure_user_doc(user_id)
+
+    # fetch user profile for context
+    user_profile = _fetch_user_profile(user_id)
+    # ตัวอย่างฟิลด์ที่คาดหวัง: displayName, dob (YYYY-MM-DD), gender, locale, timezone, interests ฯลฯ
 
     if not summary and scan_id:
         d = (
@@ -385,14 +465,15 @@ def fortune_predict():
     if not isinstance(summary, dict) or not summary:
         return jsonify({"error": "summary is required (either via scan_id or in body)"}), 400
 
+    # ---------- Build prompts ----------
     sys_th = (
         "คุณคือผู้ช่วยโหราศาสตร์ลายมือ เชี่ยวชาญการอ่านเส้นชีวิต/เส้นสมอง/เส้นหัวใจ "
         "ตอบอย่างระมัดระวัง ไม่อ้างอิงเรื่องรักษาโรคหรือการเงินแบบชี้นำลงทุน "
-        "ให้คำแนะนำเชิงบวกและนำไปใช้ได้จริงในชีวิตประจำวัน"
+        "ให้คำแนะนำเชิงบวก นำไปใช้ได้จริง และเคารพความเป็นส่วนตัวของผู้ใช้"
     )
     sys_en = (
-        "You are a palmistry assistant. You analyze life/head/heart lines with care, "
-        "avoid medical or financial advice, and provide practical, positive guidance."
+        "You are a palmistry assistant who reads life/head/heart lines carefully, "
+        "avoids medical or investment directives, and gives practical, positive, privacy-respecting guidance."
     )
     system_prompt = sys_th if language == "th" else sys_en
 
@@ -400,23 +481,41 @@ def fortune_predict():
         d = (summary.get(name) or {})
         return f"{name}: length_px={d.get('length_px')}, branch_style={d.get('branch_style')}"
 
-    user_prompt_th = (
-        f"ช่วยทำนายดวงจากลายมือโดยอิงข้อมูลสรุปนี้:\n"
-        f"- {line_desc('life')}\n- {line_desc('head')}\n- {line_desc('heart')}\n"
-        f"ขนาดภาพ: {summary.get('image_w')}x{summary.get('image_h')}, "
-        f"roi={summary.get('roi')}\n"
-        f"รูปแบบคำตอบ: bullet สั้นๆ 3-5 ข้อ + ย่อหน้าสรุป และข้อควรระวัง 1-2 ข้อ\n"
-        f"โทน: {'เป็นกันเอง' if style=='friendly' else 'เป็นทางการ'}"
-    )
-    user_prompt_en = (
-        f"Please read the palm based on this summary:\n"
-        f"- {line_desc('life')}\n- {line_desc('head')}\n- {line_desc('heart')}\n"
-        f"image: {summary.get('image_w')}x{summary.get('image_h')}, "
-        f"roi={summary.get('roi')}\n"
-        f"Return 3-5 concise bullets + a brief paragraph and 1-2 caveats.\n"
-        f"Tone: {'friendly' if style=='friendly' else 'formal'}"
-    )
-    user_prompt = user_prompt_th if language == "th" else user_prompt_en
+    # Embed user profile (safe fields only)
+    safe_profile = {}
+    for k in ("displayName", "dob", "gender", "locale", "timezone", "birthplace", "interests"):
+        if user_profile.get(k) not in (None, "", {}):
+            safe_profile[k] = user_profile.get(k)
+
+    period_text_th = "1 สัปดาห์ข้างหน้า" if period == "week" else "1 เดือนข้างหน้า"
+    period_text_en = "the next 1 week" if period == "week" else "the next 1 month"
+
+    if language == "th":
+        user_prompt = (
+            "ช่วยทำนายจากลายมือ โดยยึดข้อมูลภาพรวมและโปรไฟล์ดังนี้\n"
+            f"- {line_desc('life')}\n- {line_desc('head')}\n- {line_desc('heart')}\n"
+            f"ขนาดภาพ: {summary.get('image_w')}x{summary.get('image_h')}, roi={summary.get('roi')}\n"
+            f"ข้อมูลผู้ใช้ (ถ้ามี): {safe_profile}\n\n"
+            f"กรอบเวลา: {period_text_th}\n"
+            "รูปแบบคำตอบเป็นหัวข้อย่อย 4 หมวด และสั้นกระชับใช้งานได้จริง:\n"
+            "1) ความรัก\n2) การงาน\n3) การเงิน\n4) สุขภาพ\n\n"
+            "เพิ่ม: คำแนะนำปฏิบัติ 3-5 ข้อ และข้อควรระวัง 1-2 ข้อ\n"
+            f"โทน: {'เป็นกันเอง' if style=='friendly' else 'เป็นทางการ'}\n"
+            "ห้ามกล่าวอ้างการรักษาโรคหรือรับประกันผลลัพธ์ ทางการแพทย์/การเงิน และให้กำลังใจอย่างเหมาะสม"
+        )
+    else:
+        user_prompt = (
+            "Please read the palm using the following summary and user profile context:\n"
+            f"- {line_desc('life')}\n- {line_desc('head')}\n- {line_desc('heart')}\n"
+            f"image: {summary.get('image_w')}x{summary.get('image_h')}, roi={summary.get('roi')}\n"
+            f"user profile (if any): {safe_profile}\n\n"
+            f"Time frame: {period_text_en}\n"
+            "Return concise, actionable sections:\n"
+            "1) Love\n2) Career\n3) Finance\n4) Health\n\n"
+            "Also include: 3-5 practical tips and 1-2 caveats.\n"
+            f"Tone: {'friendly' if style=='friendly' else 'formal'}\n"
+            "Avoid medical or investment guarantees. Be supportive and realistic."
+        )
 
     payload = {
         "model": model,
@@ -428,17 +527,19 @@ def fortune_predict():
     }
 
     try:
-        r = requests.post(
+        r = _HTTP.post(
             f"{DEEPSEEK_BASE}/chat/completions",
             headers={
                 "Authorization": f"Bearer {DEEPSEEK_KEY}",
                 "Content-Type": "application/json",
             },
             json=payload,
-            timeout=60,
+            timeout=_get_timeout(),
         )
+    except requests.exceptions.ReadTimeout:
+        return jsonify({"error": "deepseek_timeout", "detail": "DeepSeek read timed out"}), 504
     except requests.RequestException as e:
-        return jsonify({"error": f"request_failed: {str(e)}"}), 502
+        return jsonify({"error": "request_failed", "detail": str(e)}), 502
 
     if not r.ok:
         try:
@@ -456,6 +557,8 @@ def fortune_predict():
         "model": model,
         "language": language,
         "style": style,
+        "period": period,
+        "user_profile_used": safe_profile,
         "answer": answer,
         "raw": resp,
         "createdAt": firestore.SERVER_TIMESTAMP,
