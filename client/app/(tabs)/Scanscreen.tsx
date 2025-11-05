@@ -232,6 +232,8 @@ const styles = StyleSheet.create({
   },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.6)",
+    backgroundColor: "rgba(0, 0, 0, 1)",
+    justifyContent: "center",
+    alignItems: "center",
   },
 });
