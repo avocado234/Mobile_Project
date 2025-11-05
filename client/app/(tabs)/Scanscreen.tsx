@@ -127,7 +127,7 @@ export default function CameraScreen() {
   };
 
   const toggleTorch = () => setTorch((current) => !current);
-  const switchCamera = () => setFacing((current) => (current === "back" ? "front" : "back"));
+
   const retake = () => {
     setPhotoUri(null);
     setFortuneResult(null);
