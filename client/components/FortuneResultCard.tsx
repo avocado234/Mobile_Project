@@ -59,7 +59,7 @@ export function FortuneResultCard({
       <View style={styles.sectionGroup}>
         {derivedParsed.sections.map((section) => (
           <View key={section.key} style={styles.section}>
-            <Text style={styles.sectionTitle}>{section.title}</Text>
+            
             {section.content.split(/\n+/).map((paragraph, idx) => (
               <Text key={idx} style={styles.sectionText}>
                 {paragraph.trim()}
