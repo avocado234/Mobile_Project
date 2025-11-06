@@ -48,14 +48,12 @@ export default function LoadingScreen({
   return (
     <View style={styles.container}>
       <View style={styles.card}>
-        <Text style={styles.brand}>{company}</Text>
+
         <Text style={styles.title}>กำลังประมวลผลลายนิ้วมือของคุณ</Text>
         <LottieView source={require("../Loading.json")} autoPlay loop style={styles.lottie} />
         <Text style={styles.phrase}>{phrases[phraseIndex] ?? phrases[0]}</Text>
       </View>
       </View>
-     
-  
   );
 }
 const styles = StyleSheet.create({
@@ -84,12 +82,12 @@ const styles = StyleSheet.create({
   card: {
     width: "88%",
     maxWidth: 340,
-    backgroundColor: "rgba(26, 12, 52, 0.92)",
+    backgroundColor: "rgba(26, 12, 52, 1)",
     borderRadius: 24,
     paddingVertical: 28,
-    paddingHorizontal: 22,
+    paddingHorizontal: 20,
     alignItems: "center",
-    gap: 14,
+    gap: 25,
     borderWidth: 1,
     borderColor: "rgba(196, 181, 253, 0.25)",
     shadowColor: "#8B5CF6",
